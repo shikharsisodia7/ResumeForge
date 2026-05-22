@@ -1,0 +1,467 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model UserProfile {
+  id              String   @id @default(cuid())
+  fullName        String
+  email           String?
+  phone           String?
+  location        String?
+  linkedIn        String?
+  github          String?
+  portfolio       String?
+  website         String?
+  customLinks     String?  // JSON array
+  summary         String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  educations      Education[]
+  experiences     Experience[]
+  projects        Project[]
+  skills          Skill[]
+  bullets         Bullet[]
+  resumes         Resume[]
+  customSections  CustomSection[]
+}
+
+model CustomSection {
+  id          String      @id @default(cuid())
+  profileId   String
+  profile     UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title       String
+  content     String?
+  order       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Education {
+  id              String      @id @default(cuid())
+  profileId       String
+  profile         UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  school          String
+  degree          String?
+  major           String?
+  minor           String?
+  gpa             String?
+  graduationDate  String?
+  coursework      String?     // JSON array
+  honors          String?
+  notes           String?
+  order           Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Experience {
+  id            String      @id @default(cuid())
+  profileId     String
+  profile       UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  title         String
+  organization  String
+  location      String?
+  startDate     String?
+  endDate       String?
+  type          String      @default("job")
+  description   String?
+  metrics       String?
+  proofLinks    String?     // JSON
+  notes         String?
+  skills        String?     // JSON skill ids/names
+  order         Int         @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  bullets       Bullet[]
+}
+
+model Project {
+  id                  String      @id @default(cuid())
+  profileId           String
+  profile             UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name                String
+  shortDescription    String?
+  longDescription     String?
+  problemSolved       String?
+  targetUsers         String?
+  techStack           String?     // JSON
+  githubLink          String?
+  demoLink            String?
+  architectureNotes   String?
+  databaseNotes       String?
+  featuresCompleted   String?
+  featuresPlanned     String?
+  challenges          String?
+  personalContribution String?
+  skillsProven        String?     // JSON
+  metrics             String?
+  awards              String?
+  hackathonName       String?
+  readinessScore      Int         @default(0)
+  order               Int         @default(0)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  bullets             Bullet[]
+}
+
+model Skill {
+  id                String      @id @default(cuid())
+  profileId         String
+  profile           UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name              String
+  category          String      @default("programming")
+  proficiency       String      @default("intermediate")
+  relatedExperience String?     // JSON ids
+  relatedProjects   String?     // JSON ids
+  relatedBullets    String?     // JSON ids
+  relatedCourses    String?
+  lastUsed          String?
+  evidenceStrength  Int         @default(0)
+  resumeUsageCount  Int         @default(0)
+  jobMatchCount     Int         @default(0)
+  order             Int         @default(0)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model Bullet {
+  id              String      @id @default(cuid())
+  profileId       String
+  profile         UserProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  text            String
+  category        String      @default("technical")
+  actionVerb      String?
+  impact          String?
+  metric          String?
+  status          String      @default("rough")
+  version         Int         @default(1)
+  notes           String?
+  relatedRole     String?
+  skillTags       String?     // JSON
+  experienceId    String?
+  experience      Experience? @relation(fields: [experienceId], references: [id])
+  projectId       String?
+  project         Project?    @relation(fields: [projectId], references: [id])
+  strengthScore   Int         @default(0)
+  clarityScore    Int         @default(0)
+  specificityScore Int        @default(0)
+  impactScore     Int         @default(0)
+  keywordScore    Int         @default(0)
+  atsScore        Int         @default(0)
+  totalScore      Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model Resume {
+  id              String          @id @default(cuid())
+  profileId       String
+  profile         UserProfile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name            String
+  targetRole      String?
+  targetCompany   String?
+  targetIndustry  String?
+  targetJobLevel  String?
+  template        String          @default("classic")
+  font            String          @default("inter")
+  spacing         String          @default("normal")
+  margins         String          @default("normal")
+  onePageMode     Boolean         @default(true)
+  sectionOrder    String?         // JSON
+  sectionHeaders  String?         // JSON
+  hiddenSections  String?         // JSON
+  notes           String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  versions        ResumeVersion[]
+  sections        ResumeSection[]
+}
+
+model ResumeSection {
+  id          String   @id @default(cuid())
+  resumeId    String
+  resume      Resume   @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  type        String
+  title       String
+  content     String?  // JSON selected ids
+  order       Int      @default(0)
+  visible     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ResumeVersion {
+  id                    String          @id @default(cuid())
+  resumeId              String
+  resume                Resume            @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  versionName           String
+  parentVersionId       String?
+  targetCompany         String?
+  targetRole            String?
+  targetIndustry        String?
+  selectedBullets       String?           // JSON ids
+  selectedSkills        String?
+  selectedProjects      String?
+  selectedExperiences   String?
+  selectedEducation     String?
+  selectedAwards        String?
+  atsScore              Int               @default(0)
+  jobMatchScore         Int               @default(0)
+  keywordScore          Int               @default(0)
+  bulletScore           Int               @default(0)
+  tailoringConfidence   Int               @default(0)
+  jobDescriptionId      String?
+  jobDescription        JobDescription?   @relation(fields: [jobDescriptionId], references: [id])
+  changesSummary        String?           // JSON
+  notes                 String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  scoreReports          ScoreReport[]
+  matchReports          MatchReport[]
+  exportHistory         ExportHistory[]
+  applications          Application[]
+}
+
+model JobDescription {
+  id                  String          @id @default(cuid())
+  title               String
+  company             String
+  location            String?
+  descriptionText     String
+  sourceUrl           String?
+  deadline            String?
+  notes               String?
+  category            String          @default("software-engineering")
+  extractedKeywords   String?         // JSON full analysis
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  keywords            JobKeyword[]
+  matchReports        MatchReport[]
+  resumeVersions      ResumeVersion[]
+  applications        Application[]
+  coverLetters        CoverLetter[]
+}
+
+model JobKeyword {
+  id                String         @id @default(cuid())
+  jobDescriptionId  String
+  jobDescription    JobDescription @relation(fields: [jobDescriptionId], references: [id], onDelete: Cascade)
+  term              String
+  category          String
+  importance        Int            @default(50)
+  frequency         Int            @default(1)
+  isRequired        Boolean        @default(false)
+}
+
+model MatchReport {
+  id                String         @id @default(cuid())
+  jobDescriptionId  String
+  jobDescription    JobDescription @relation(fields: [jobDescriptionId], references: [id], onDelete: Cascade)
+  resumeVersionId   String?
+  resumeVersion     ResumeVersion? @relation(fields: [resumeVersionId], references: [id])
+  overallScore      Int            @default(0)
+  hardSkillScore      Int            @default(0)
+  softSkillScore      Int            @default(0)
+  keywordScore        Int            @default(0)
+  experienceScore     Int            @default(0)
+  projectScore        Int            @default(0)
+  educationScore      Int            @default(0)
+  responsibilityScore Int            @default(0)
+  atsFormatScore      Int            @default(0)
+  reportData          String?        // JSON full report
+  createdAt           DateTime       @default(now())
+}
+
+model ScoreReport {
+  id              String        @id @default(cuid())
+  resumeVersionId String
+  resumeVersion   ResumeVersion @relation(fields: [resumeVersionId], references: [id], onDelete: Cascade)
+  type            String        // ats, bullet, tailoring
+  totalScore      Int           @default(0)
+  breakdown       String?       // JSON
+  warnings        String?
+  recommendations String?
+  createdAt       DateTime      @default(now())
+}
+
+model Application {
+  id                String         @id @default(cuid())
+  company           String
+  role              String
+  location          String?
+  jobUrl            String?
+  dateSaved         DateTime       @default(now())
+  dateApplied       String?
+  deadline          String?
+  resumeVersionId   String?
+  resumeVersion     ResumeVersion? @relation(fields: [resumeVersionId], references: [id])
+  coverLetterId     String?
+  coverLetter       CoverLetter?   @relation(fields: [coverLetterId], references: [id])
+  jobDescriptionId  String?
+  jobDescription    JobDescription? @relation(fields: [jobDescriptionId], references: [id])
+  recruiterName     String?
+  recruiterEmail    String?
+  status            String         @default("saved")
+  followUpDate      String?
+  interviewDates    String?        // JSON
+  outcome           String?
+  matchScoreAtApply Int?
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  interviewPrep     InterviewPrep?
+  starStories       StarStory[]
+}
+
+model CoverLetter {
+  id                String         @id @default(cuid())
+  title             String
+  template          String         @default("internship")
+  company           String?
+  role              String?
+  content           String
+  jobDescriptionId  String?
+  jobDescription    JobDescription? @relation(fields: [jobDescriptionId], references: [id])
+  resumeVersionId   String?
+  fields            String?        // JSON user fields
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  applications      Application[]
+}
+
+model InterviewPrep {
+  id              String      @id @default(cuid())
+  applicationId   String      @unique
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  keywords        String?
+  likelyTopics    String?
+  projectsToDiscuss String?
+  experiencesToDiscuss String?
+  skillsToHighlight String?
+  weakAreas       String?
+  questionsToAsk  String?
+  interviewNotes  String?
+  prepData        String?     // JSON
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model StarStory {
+  id              String       @id @default(cuid())
+  situation       String
+  task            String
+  action          String
+  result          String
+  skillsShown     String?
+  category        String       @default("leadership")
+  tags            String?
+  relatedExperienceId String?
+  relatedProjectId    String?
+  applicationId   String?
+  application     Application? @relation(fields: [applicationId], references: [id])
+  strengthScore   Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model FileAsset {
+  id              String   @id @default(cuid())
+  fileName        String
+  filePath        String
+  fileType        String
+  fileSize        Int      @default(0)
+  category        String   @default("other")
+  tags            String?
+  relatedResumeId String?
+  relatedJobId    String?
+  relatedApplicationId String?
+  relatedProjectId String?
+  importance      String   @default("medium")
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model TimelineEvent {
+  id          String   @id @default(cuid())
+  type        String
+  title       String
+  description String?
+  entityType  String?
+  entityId    String?
+  metadata    String?
+  createdAt   DateTime @default(now())
+}
+
+model ExportHistory {
+  id              String        @id @default(cuid())
+  resumeVersionId String
+  resumeVersion   ResumeVersion @relation(fields: [resumeVersionId], references: [id], onDelete: Cascade)
+  format          String
+  targetRole      String?
+  targetCompany   String?
+  filePath        String?
+  createdAt       DateTime      @default(now())
+}
+
+model KeywordDictionary {
+  id        String   @id @default(cuid())
+  category  String   @unique
+  terms     String   // JSON array
+  updatedAt DateTime @updatedAt
+}
+
+model ActionVerbDictionary {
+  id        String   @id @default(cuid())
+  type      String   @unique // strong, weak
+  verbs     String   // JSON
+  updatedAt DateTime @updatedAt
+}
+
+model Settings {
+  id                    String   @id @default("default")
+  theme                 String   @default("system")
+  defaultTemplate       String   @default("classic")
+  scoringRules          String?
+  weakWords             String?
+  updatedAt             DateTime @updatedAt
+}
+
+model Award {
+  id          String   @id @default(cuid())
+  profileId   String
+  title       String
+  issuer      String?
+  date        String?
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Certification {
+  id          String   @id @default(cuid())
+  profileId   String
+  name        String
+  issuer      String?
+  date        String?
+  url         String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+}
+
+model Leadership {
+  id          String   @id @default(cuid())
+  profileId   String
+  title       String
+  organization String?
+  startDate   String?
+  endDate     String?
+  description String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+}
