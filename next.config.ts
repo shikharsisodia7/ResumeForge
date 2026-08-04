@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  serverExternalPackages: ["pdf-parse", "mammoth", "@react-pdf/renderer"],
 };
 
 export default nextConfig;

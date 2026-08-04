@@ -1,49 +1,50 @@
-"use client";
-
-import { useTheme } from "next-themes";
-import { Moon, Sun, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { FileText, LogOut } from "lucide-react";
 
-export function Header({ title, breadcrumbs }: { title: string; breadcrumbs?: { label: string; href?: string }[] }) {
-  const { theme, setTheme } = useTheme();
-
+export function Header({ user }: { user: { displayName: string; email: string } }) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-zinc-200 bg-white/80 px-6 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
-      <div className="pl-10 md:pl-0">
-        {breadcrumbs && breadcrumbs.length > 0 && (
-          <nav className="mb-0.5 flex items-center gap-1 text-xs text-zinc-500">
-            {breadcrumbs.map((b, i) => (
-              <span key={i} className="flex items-center gap-1">
-                {i > 0 && <span>/</span>}
-                {b.href ? (
-                  <Link href={b.href} className="hover:text-indigo-600">
-                    {b.label}
-                  </Link>
-                ) : (
-                  <span>{b.label}</span>
-                )}
-              </span>
-            ))}
+    <header className="border-b border-border bg-card">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+        <div className="flex items-center gap-8">
+          <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+            <FileText className="size-5 text-accent" aria-hidden="true" />
+            ResumeForge
+          </Link>
+          <nav className="hidden items-center gap-6 text-sm text-muted-foreground sm:flex">
+            <Link href="/dashboard" className="hover:text-foreground">
+              Dashboard
+            </Link>
+            <Link href="/prompts" className="hover:text-foreground">
+              Prompt library
+            </Link>
+            <Link href="/gallery" className="hover:text-foreground">
+              Gallery
+            </Link>
           </nav>
-        )}
-        <h1 className="text-lg font-semibold text-zinc-900 dark:text-white">{title}</h1>
-      </div>
-      <div className="flex items-center gap-2">
-        <Link href="/search">
-          <Button variant="ghost" size="sm" aria-label="Search">
-            <Search className="h-4 w-4" />
-          </Button>
-        </Link>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          aria-label="Toggle theme"
-        >
-          <Sun className="h-4 w-4 dark:hidden" />
-          <Moon className="hidden h-4 w-4 dark:block" />
-        </Button>
+        </div>
+
+        <details className="group relative">
+          <summary className="flex list-none items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted [&::-webkit-details-marker]:hidden">
+            <span className="flex size-7 items-center justify-center rounded-full bg-accent-muted text-xs font-semibold text-accent">
+              {user.displayName.slice(0, 1).toUpperCase()}
+            </span>
+            <span className="hidden max-w-[160px] truncate sm:inline">{user.displayName}</span>
+          </summary>
+          <div className="absolute right-0 z-20 mt-2 w-56 rounded-md border border-border bg-card p-1 shadow-lg">
+            <div className="px-3 py-2">
+              <p className="truncate text-sm font-medium">{user.displayName}</p>
+              <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+            </div>
+            <div className="my-1 border-t border-border" />
+            <a
+              href="/auth/logout"
+              className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-muted"
+            >
+              <LogOut className="size-4" aria-hidden="true" />
+              Log out
+            </a>
+          </div>
+        </details>
       </div>
     </header>
   );

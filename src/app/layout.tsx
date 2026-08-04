@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ResumeTailor Pro — Local Resume Intelligence",
-  description: "Local-first resume operating system for tailoring, ATS scoring, and job matching",
+  title: "ResumeForge — AI Resume Formatting",
+  description: "Upload a resume, let AI organize and format it, tailor it per job, and export a polished PDF.",
 };
 
 export default function RootLayout({
