@@ -5,10 +5,17 @@ import { createChatModel } from "@/lib/ai/model";
 
 /**
  * Invokes the model for a validated structured response, with one repair
- * attempt on failure. OpenAI's strict JSON-schema mode already enforces the
- * shape at the API level, but our Zod schemas also carry refinements (e.g.
- * "sectionOrder must be a permutation") that JSON Schema can't express, so a
- * response can still fail our own validation — hence the second try.
+ * attempt on failure.
+ *
+ * Uses the "functionCalling" method rather than OpenAI's newer strict
+ * json_schema response format: strict mode requires every property to be
+ * listed in `required` (optionality is expressed via nullable types, not
+ * omission), which our schemas' widespread use of `.optional()` violates —
+ * OpenAI rejects the schema outright with a 400 before the model ever runs.
+ * Function calling has no such constraint. Validation still happens fully
+ * on our side (schema.parse, including refinements JSON Schema can't
+ * express, like "sectionOrder must be a permutation"), so this doesn't
+ * weaken correctness — it just uses a wire format our schemas fit.
  */
 export async function callStructured<T extends Record<string, unknown>>(params: {
   systemPrompt: string;
@@ -18,8 +25,7 @@ export async function callStructured<T extends Record<string, unknown>>(params: 
 }): Promise<T> {
   const { systemPrompt, userPrompt, schema, schemaName } = params;
   const model = createChatModel().withStructuredOutput(schema, {
-    method: "jsonSchema",
-    strict: true,
+    method: "functionCalling",
     name: schemaName,
   });
 
