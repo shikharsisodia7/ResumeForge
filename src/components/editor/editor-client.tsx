@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { ActivePromptsList } from "@/components/editor/active-prompts-list";
@@ -9,6 +9,7 @@ import { DocumentPreview } from "@/components/editor/document-preview";
 import { VersionHeader } from "@/components/editor/version-header";
 import {
   ApiError,
+  getPdfPageCount,
   listPrompts,
   listVersionPrompts,
   reorderVersionPrompts,
@@ -31,6 +32,26 @@ export function EditorClient({
   const [savedPrompts, setSavedPrompts] = useState(initialSavedPrompts);
   const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [pageCount, setPageCount] = useState<number | null>(null);
+
+  // Sourced from the same server-side @react-pdf/renderer output "Download
+  // PDF" uses, so this can never silently disagree with the real PDF — a
+  // stale DOM-height guess in the on-screen preview is exactly how a resume
+  // that looks like one page ends up printing as two.
+  useEffect(() => {
+    let cancelled = false;
+    getPdfPageCount(version.id)
+      .then(({ pageCount: count }) => {
+        if (!cancelled) setPageCount(count);
+      })
+      .catch(() => {
+        // Non-fatal — the preview still renders; the page-count badge just
+        // stays hidden until the next successful check.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [version.id, version.revision]);
 
   async function refreshVersionPrompts() {
     try {
@@ -134,6 +155,11 @@ export function EditorClient({
         </div>
 
         <div className={cn("overflow-x-auto rounded-lg bg-muted p-6", mobileTab !== "preview" && "hidden lg:block")}>
+          {pageCount !== null && (
+            <p className="mb-3 text-center text-xs text-muted-foreground">
+              {pageCount === 1 ? "1 page" : `${pageCount} pages`} — matches the downloaded PDF exactly
+            </p>
+          )}
           <DocumentPreview content={version.contentJson} style={version.styleJson} />
         </div>
       </div>

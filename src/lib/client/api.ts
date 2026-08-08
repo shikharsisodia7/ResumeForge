@@ -88,6 +88,9 @@ export const undoVersion = (versionId: string) =>
 
 export const pdfDownloadUrl = (versionId: string) => `/api/versions/${versionId}/pdf`;
 
+export const getPdfPageCount = (versionId: string) =>
+  apiFetch<{ pageCount: number }>(`/api/versions/${versionId}/pdf/page-count`);
+
 // --- Version prompts ---
 
 export const listVersionPrompts = (versionId: string) =>

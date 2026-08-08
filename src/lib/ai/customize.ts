@@ -1,4 +1,5 @@
 import { assertNoFabrication } from "@/lib/ai/fact-guard";
+import { assertNoLeakedCommentary } from "@/lib/ai/leak-guard";
 import { buildCustomizeUserPrompt, CUSTOMIZE_SYSTEM_PROMPT } from "@/lib/ai/prompts/customize";
 import { callStructured } from "@/lib/ai/structured-call";
 import { customizationResultSchema } from "@/lib/schemas/customization";
@@ -56,6 +57,7 @@ export async function runCustomization(params: {
   if (result.content) {
     nextContent = hydrateResumeContent(result.content);
     assertNoFabrication(baseContent, nextContent);
+    assertNoLeakedCommentary(nextContent);
   }
 
   return {

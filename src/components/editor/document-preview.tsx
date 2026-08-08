@@ -87,9 +87,11 @@ export function DocumentPreview({ content, style }: { content: ResumeContent; st
             <h2 style={headingStyle}>{SECTION_LABELS[key]}</h2>
             {content.education.map((edu) => (
               <div key={edu.id} className="mb-2">
-                <div className="flex justify-between font-semibold">
-                  <span>{edu.institution}</span>
-                  <span className="font-normal text-neutral-500">{dateRange(edu.startDate, edu.endDate)}</span>
+                <div className="flex justify-between gap-2 font-semibold">
+                  <span className="min-w-0 flex-1 break-words">{edu.institution}</span>
+                  <span className="shrink-0 whitespace-nowrap font-normal text-neutral-500">
+                    {dateRange(edu.startDate, edu.endDate)}
+                  </span>
                 </div>
                 {(edu.degree || edu.fieldOfStudy) && (
                   <p className="italic text-neutral-600">
@@ -109,12 +111,14 @@ export function DocumentPreview({ content, style }: { content: ResumeContent; st
             <h2 style={headingStyle}>{SECTION_LABELS[key]}</h2>
             {content.experience.map((exp) => (
               <div key={exp.id} className="mb-2">
-                <div className="flex justify-between font-semibold">
-                  <span>
+                <div className="flex justify-between gap-2 font-semibold">
+                  <span className="min-w-0 flex-1 break-words">
                     {exp.title}
                     {exp.organization ? ` — ${exp.organization}` : ""}
                   </span>
-                  <span className="font-normal text-neutral-500">{dateRange(exp.startDate, exp.endDate)}</span>
+                  <span className="shrink-0 whitespace-nowrap font-normal text-neutral-500">
+                    {dateRange(exp.startDate, exp.endDate)}
+                  </span>
                 </div>
                 {exp.location && <p className="italic text-neutral-600">{exp.location}</p>}
                 {renderBullets(exp.bullets)}
@@ -129,12 +133,14 @@ export function DocumentPreview({ content, style }: { content: ResumeContent; st
             <h2 style={headingStyle}>{SECTION_LABELS[key]}</h2>
             {content.projects.map((proj) => (
               <div key={proj.id} className="mb-2">
-                <div className="flex justify-between font-semibold">
-                  <span>
+                <div className="flex justify-between gap-2 font-semibold">
+                  <span className="min-w-0 flex-1 break-words">
                     {proj.name}
                     {proj.role ? ` — ${proj.role}` : ""}
                   </span>
-                  <span className="font-normal text-neutral-500">{dateRange(proj.startDate, proj.endDate)}</span>
+                  <span className="shrink-0 whitespace-nowrap font-normal text-neutral-500">
+                    {dateRange(proj.startDate, proj.endDate)}
+                  </span>
                 </div>
                 {renderBullets(proj.bullets)}
               </div>
@@ -160,12 +166,12 @@ export function DocumentPreview({ content, style }: { content: ResumeContent; st
           <section key={key} style={{ marginBottom: style.sectionSpacing }}>
             <h2 style={headingStyle}>{SECTION_LABELS[key]}</h2>
             {content.certifications.map((cert) => (
-              <div key={cert.id} className="flex justify-between">
-                <span>
+              <div key={cert.id} className="flex justify-between gap-2">
+                <span className="min-w-0 flex-1 break-words">
                   <span className="font-semibold">{cert.name}</span>
                   {cert.issuer ? ` — ${cert.issuer}` : ""}
                 </span>
-                <span className="text-neutral-500">{cert.date}</span>
+                <span className="shrink-0 whitespace-nowrap text-neutral-500">{cert.date}</span>
               </div>
             ))}
           </section>
@@ -177,12 +183,12 @@ export function DocumentPreview({ content, style }: { content: ResumeContent; st
             <h2 style={headingStyle}>{SECTION_LABELS[key]}</h2>
             {content.awards.map((award) => (
               <div key={award.id} className="mb-1.5">
-                <div className="flex justify-between font-semibold">
-                  <span>
+                <div className="flex justify-between gap-2 font-semibold">
+                  <span className="min-w-0 flex-1 break-words">
                     {award.title}
                     {award.issuer ? ` — ${award.issuer}` : ""}
                   </span>
-                  <span className="font-normal text-neutral-500">{award.date}</span>
+                  <span className="shrink-0 whitespace-nowrap font-normal text-neutral-500">{award.date}</span>
                 </div>
                 {award.description && <p>{award.description}</p>}
               </div>
@@ -211,6 +217,7 @@ export function DocumentPreview({ content, style }: { content: ResumeContent; st
   return (
     <div
       className="paper mx-auto text-neutral-900"
+      data-page-size={style.pageSize}
       style={{
         width: page.width,
         minHeight: page.height,

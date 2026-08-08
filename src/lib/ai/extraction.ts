@@ -1,4 +1,5 @@
 import { buildExtractionUserPrompt, EXTRACTION_SYSTEM_PROMPT } from "@/lib/ai/prompts/extraction";
+import { assertNoLeakedCommentary } from "@/lib/ai/leak-guard";
 import { callStructured } from "@/lib/ai/structured-call";
 import { hydrateResumeContent, resumeContentInputSchema, type ResumeContent } from "@/lib/schemas/resume-content";
 
@@ -10,5 +11,7 @@ export async function runExtraction(sourceText: string): Promise<ResumeContent> 
     schema: resumeContentInputSchema,
     schemaName: "resume_content",
   });
-  return hydrateResumeContent(input);
+  const content = hydrateResumeContent(input);
+  assertNoLeakedCommentary(content);
+  return content;
 }

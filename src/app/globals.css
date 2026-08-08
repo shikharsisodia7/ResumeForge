@@ -78,3 +78,52 @@ body {
   background: var(--paper);
   box-shadow: var(--paper-shadow);
 }
+
+/*
+ * Browser printing (Ctrl+P) is a best-effort fallback — "Download PDF" (the
+ * server-side @react-pdf/renderer output) is the source of truth and the
+ * only mechanism guaranteed to match the app's own page-size/margin math.
+ * Without this block there is no @page rule at all: the browser adds its
+ * own default margins on top of the app's internal padding, prints the
+ * entire dashboard chrome (sidebar, cards, muted background) alongside the
+ * resume, and paginates using its own layout pass instead of the resume's
+ * actual content height — which is how a resume that looks like one page
+ * on screen can come out as two printed pages with content cut off.
+ *
+ * @page size is fixed to letter here because CSS @page cannot be
+ * conditioned on the resume's configured page size (no attribute selector
+ * support) — an A4-configured resume printed via the browser will still be
+ * requested on a Letter sheet. This is a known, documented limitation of
+ * pure-CSS browser printing; Download PDF renders the true configured page
+ * size server-side and does not have this limitation.
+ */
+@media print {
+  @page {
+    size: letter;
+    margin: 0;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .paper,
+  .paper * {
+    visibility: visible;
+  }
+
+  .paper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    box-shadow: none;
+    border-radius: 0;
+    width: 8.5in;
+    min-height: 11in;
+  }
+
+  .paper[data-page-size="a4"] {
+    width: 210mm;
+    min-height: 297mm;
+  }
+}

@@ -54,6 +54,24 @@ export function ResumeDocument({ content, style }: { content: ResumeContent; sty
     entryHeaderRow: {
       flexDirection: "row",
       justifyContent: "space-between",
+      alignItems: "flex-start",
+    },
+    // The left side of an entry header (title/organization/institution) must
+    // be allowed to shrink and wrap. Yoga (react-pdf's layout engine)
+    // defaults flexShrink to 0, unlike web CSS, so without this a long title
+    // holds its full natural width and pushes entryDates past the page's
+    // right margin. `flexShrink` on a `flexBasis: "auto"` wrapping Text node
+    // also has to be avoided here: Yoga's two-pass measurement mis-computes
+    // the sibling's (entryDates') position when a flexShrink item wraps,
+    // reserving too little space and letting the date overflow the page
+    // regardless of its own flexShrink:0 — confirmed by isolated repro.
+    // `flexGrow: 1, flexBasis: 0` is the standard "fill remaining space and
+    // wrap" pattern and does not hit that bug.
+    entryHeaderLeft: {
+      flexGrow: 1,
+      flexShrink: 1,
+      flexBasis: 0,
+      paddingRight: 10,
     },
     entryTitle: {
       fontFamily: fonts.bold,
@@ -64,6 +82,10 @@ export function ResumeDocument({ content, style }: { content: ResumeContent; sty
     },
     entryDates: {
       color: "#444444",
+      // Dates never shrink or wrap — they stay at their natural width so
+      // the full range (e.g. "September 2023 – Present") is always intact.
+      flexShrink: 0,
+      flexGrow: 0,
     },
     bulletRow: {
       flexDirection: "row",
@@ -113,7 +135,7 @@ export function ResumeDocument({ content, style }: { content: ResumeContent; sty
             {content.education.map((edu) => (
               <View key={edu.id} style={s.entry} wrap={false}>
                 <View style={s.entryHeaderRow}>
-                  <Text style={s.entryTitle}>{edu.institution}</Text>
+                  <Text style={[s.entryTitle, s.entryHeaderLeft]}>{edu.institution}</Text>
                   <Text style={s.entryDates}>{dateRange(edu.startDate, edu.endDate)}</Text>
                 </View>
                 {(edu.degree || edu.fieldOfStudy) && (
@@ -138,7 +160,7 @@ export function ResumeDocument({ content, style }: { content: ResumeContent; sty
             {content.experience.map((exp) => (
               <View key={exp.id} style={s.entry} wrap={false}>
                 <View style={s.entryHeaderRow}>
-                  <Text style={s.entryTitle}>
+                  <Text style={[s.entryTitle, s.entryHeaderLeft]}>
                     {exp.title}
                     {exp.organization ? ` — ${exp.organization}` : ""}
                   </Text>
@@ -161,7 +183,7 @@ export function ResumeDocument({ content, style }: { content: ResumeContent; sty
             {content.projects.map((proj) => (
               <View key={proj.id} style={s.entry} wrap={false}>
                 <View style={s.entryHeaderRow}>
-                  <Text style={s.entryTitle}>
+                  <Text style={[s.entryTitle, s.entryHeaderLeft]}>
                     {proj.name}
                     {proj.role ? ` — ${proj.role}` : ""}
                   </Text>
@@ -203,7 +225,7 @@ export function ResumeDocument({ content, style }: { content: ResumeContent; sty
             </Text>
             {content.certifications.map((cert) => (
               <View key={cert.id} style={s.entryHeaderRow} wrap={false}>
-                <Text>
+                <Text style={s.entryHeaderLeft}>
                   <Text style={s.entryTitle}>{cert.name}</Text>
                   {cert.issuer ? ` — ${cert.issuer}` : ""}
                 </Text>
@@ -223,7 +245,7 @@ export function ResumeDocument({ content, style }: { content: ResumeContent; sty
             {content.awards.map((award) => (
               <View key={award.id} style={s.entry} wrap={false}>
                 <View style={s.entryHeaderRow}>
-                  <Text style={s.entryTitle}>
+                  <Text style={[s.entryTitle, s.entryHeaderLeft]}>
                     {award.title}
                     {award.issuer ? ` — ${award.issuer}` : ""}
                   </Text>

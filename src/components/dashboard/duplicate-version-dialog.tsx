@@ -107,7 +107,7 @@ export function DuplicateVersionDialog({
               rows={5}
               value={jobDescription}
               onChange={(e) => setJobDescription(e.target.value)}
-              placeholder="Paste the job posting to truthfully emphasize matching experience..."
+              placeholder="Paste the job posting to truthfully emphasize matching experience…"
             />
           </div>
         </div>
