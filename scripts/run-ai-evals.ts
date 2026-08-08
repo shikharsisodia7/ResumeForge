@@ -14,6 +14,14 @@
  * Never logs full resume content or secrets — only fixture ids, pass/fail,
  * and short violation summaries.
  */
+import { config as loadEnv } from "dotenv";
+
+// Next's dev/build/start commands load .env then .env.local automatically;
+// a standalone tsx script does not, so OPENAI_API_KEY etc. would otherwise
+// silently be undefined here even though the app itself is fully configured.
+loadEnv({ path: ".env" });
+loadEnv({ path: ".env.local", override: true });
+
 import { SOURCE_TEXT_FIXTURES } from "../src/fixtures/source-text-fixtures";
 import { runExtraction } from "../src/lib/ai/extraction";
 import { DEFAULT_RESUME_STYLE } from "../src/lib/schemas/resume-style";
