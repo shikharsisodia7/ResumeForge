@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { dirname } from "node:path";
 import { pathToFileURL } from "node:url";
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
@@ -8,6 +9,17 @@ const require = createRequire(import.meta.url);
 GlobalWorkerOptions.workerSrc = pathToFileURL(
   require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs"),
 ).href;
+
+// Without this, pdf.js falls back to its own metric approximations for
+// any non-embedded standard font (Helvetica, Times, etc.), warning
+// "Ensure that the standardFontDataUrl API parameter is provided" on
+// every page — and item widths (what the clipping check relies on)
+// come from the same approximation instead of the real font metrics.
+// Node's font-data loader hands this straight to fs.promises.readFile,
+// which (unlike the worker's `new Worker(url)`) rejects "file://" URL
+// strings as literal filenames — so this must stay a plain OS path,
+// not pathToFileURL(...).href like workerSrc above.
+const STANDARD_FONT_DATA_URL = `${dirname(require.resolve("pdfjs-dist/package.json"))}/standard_fonts/`;
 
 export interface PdfTextItem {
   text: string;
@@ -39,7 +51,11 @@ export interface PdfInspection {
  */
 export async function inspectPdf(buffer: Buffer): Promise<PdfInspection> {
   const data = new Uint8Array(buffer);
-  const doc = await getDocument({ data, isEvalSupported: false }).promise;
+  const doc = await getDocument({
+    data,
+    isEvalSupported: false,
+    standardFontDataUrl: STANDARD_FONT_DATA_URL,
+  }).promise;
   const pages: PdfPageInspection[] = [];
 
   for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber++) {
