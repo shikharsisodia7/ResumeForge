@@ -33,12 +33,25 @@ import type { ResumeContent } from "../src/lib/schemas/resume-content";
 const RIGHT_EDGE_TOLERANCE_PT = 1;
 
 function flattenText(content: ResumeContent): string {
-  const parts: string[] = [content.basics.fullName, content.summary ?? ""];
-  for (const e of content.experience) parts.push(e.title, e.organization, ...e.bullets);
-  for (const e of content.education) parts.push(e.institution, e.degree ?? "", e.fieldOfStudy ?? "", ...e.highlights);
-  for (const p of content.projects) parts.push(p.name, ...p.bullets);
-  for (const c of content.certifications) parts.push(c.name);
-  for (const a of content.awards) parts.push(a.title, a.description ?? "");
+  const parts: string[] = [
+    content.basics.fullName,
+    content.basics.email ?? "",
+    content.basics.phone ?? "",
+    content.basics.location ?? "",
+    content.summary ?? "",
+    ...content.basics.links.map((l) => l.url),
+  ];
+  for (const e of content.experience) {
+    parts.push(e.title, e.organization, e.startDate ?? "", e.endDate ?? "", ...e.bullets);
+  }
+  for (const e of content.education) {
+    parts.push(e.institution, e.degree ?? "", e.fieldOfStudy ?? "", e.startDate ?? "", e.endDate ?? "", ...e.highlights);
+  }
+  for (const p of content.projects) {
+    parts.push(p.name, p.startDate ?? "", p.endDate ?? "", ...p.bullets);
+  }
+  for (const c of content.certifications) parts.push(c.name, c.date ?? "");
+  for (const a of content.awards) parts.push(a.title, a.date ?? "", a.description ?? "");
   for (const s of content.skills) parts.push(...s.items);
   for (const s of content.additional) parts.push(s.title, ...s.items);
   return parts.join(" \n ");
