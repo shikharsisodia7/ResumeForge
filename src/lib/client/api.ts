@@ -47,12 +47,6 @@ export const getResume = (resumeId: string) =>
 export const deleteResume = (resumeId: string) =>
   apiFetch<{ deleted: true }>(`/api/resumes/${resumeId}`, { method: "DELETE" });
 
-export const uploadResume = (formData: FormData) =>
-  apiFetch<{ resume: { id: string; title: string }; version: { id: string; name: string } }>(
-    "/api/resumes/upload",
-    { method: "POST", body: formData },
-  );
-
 export const formatResume = (resumeId: string) =>
   apiFetch<{ version: VersionSummary }>(`/api/resumes/${resumeId}/format`, { method: "POST" });
 

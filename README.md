@@ -1,5 +1,7 @@
 # ResumeForge
 
+[![CI](https://github.com/shikharsisodia7/ResumeForge/actions/workflows/ci.yml/badge.svg)](https://github.com/shikharsisodia7/ResumeForge/actions/workflows/ci.yml)
+
 AI resume formatting: upload a resume, an AI agent extracts and organizes it into structured,
 ATS-friendly content, you customize the layout with plain-English instructions, tailor it per job
 opening, and export a real, selectable-text PDF.
@@ -96,20 +98,39 @@ npm run dev                 # http://localhost:3000
 
 ## Testing
 
-`npm run test` runs the Vitest suite (56 tests): file validation (type sniffing, size limits,
+`npm run test` runs the Vitest suite (84 tests): file validation (type sniffing, size limits,
 extension/content mismatch), text normalization, structured AI-output validation, style-patch
 validation (closed vocabulary, range checks, `sectionOrder` permutation), reset behavior, the
 fabrication guard, the structured-output repair/retry path, cross-user ownership isolation
-(`requireOwnedResume`/`requireOwnedVersion`/`requireOwnedPrompt`), and the gallery prompt-copy
-route (independent copy, duplicate-copy idempotency, self-copy rejection). All external services
-(Prisma, the AI model) are mocked at the module boundary — no live database or API key is needed
-to run this suite.
+(`requireOwnedResume`/`requireOwnedVersion`/`requireOwnedPrompt`), the gallery prompt-copy
+route (independent copy, duplicate-copy idempotency, self-copy rejection), the direct-to-Blob
+upload flow (cross-user pathname rejection, idempotent finalize replay, concurrent-finalize race
+resolution, content-mismatch cleanup), and the e2e webServer identity check
+(`src/lib/dev/assert-expected-server.ts`). All external services (Prisma, the AI model) are
+mocked at the module boundary — no live database or API key is needed to run this suite.
 
-`npm run test:e2e` (Playwright) covers what's verifiable without live Auth0/Postgres/OpenAI
-credentials: the landing page renders for signed-out visitors, and every protected page/API route
-correctly redirects to/rejects with Auth0 login when signed out. Run `npx playwright install`
-once before the first run. A full authenticated upload → format → customize → PDF walkthrough
-requires a configured environment (see above) and is best verified manually against it.
+`npm run test:e2e` (Playwright, 39 tests) covers what's verifiable without live Auth0/Postgres/
+OpenAI credentials: the landing page renders for signed-out visitors, every protected page/API
+route correctly redirects to/rejects with Auth0 login when signed out, and real-Chromium layout
+regression checks (right-edge clipping, print isolation) against all 32 synthetic fixtures. Run
+`npx playwright install` once before the first run. A full authenticated upload → format →
+customize → PDF walkthrough requires a configured environment (see above) and is best verified
+manually against it.
+
+`RUN_AI_EVALS=true npm run test:ai-evals` runs a separate, opt-in live-model harness (6 fixtures
+against the real OpenAI extraction prompt) — costs real API tokens, so it never runs in CI or on
+a normal `npm test`. Requires a funded `OPENAI_API_KEY`.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull request: install, Prisma
+generate, lint, typecheck, the Vitest suite, the Playwright suite, and a production build — all
+with placeholder env values, since none of these steps make a live OpenAI/Auth0/Postgres/Blob
+call. Superseded runs on the same branch are cancelled automatically.
+
+`.github/workflows/ai-evals.yml` is separate and **manually dispatched only** (`workflow_dispatch`)
+— it spends real OpenAI credits running the live eval harness above and is never a required check.
+It reads `OPENAI_API_KEY`/`OPENAI_MODEL` from GitHub Actions Secrets, never from the workflow file.
 
 ## Deploying to Vercel
 
@@ -128,9 +149,14 @@ requires a configured environment (see above) and is best verified manually agai
 
 ## How the formatting pipeline works
 
-1. **Upload** (`POST /api/resumes/upload`): file is validated by real content sniffing (not just
-   the declared MIME type), text is extracted (`pdf-parse` / `mammoth` / UTF-8), hashed (SHA-256,
-   for duplicate detection), and stored as a private Blob object.
+1. **Upload** — the browser uploads the file directly to Blob storage (`POST /api/resumes/upload/authorize`
+   issues a short-lived, size/type-constrained client token; the file never passes through this
+   app's own server, since every Vercel Function caps request bodies at 4.5 MB regardless of
+   plan). `POST /api/resumes/finalize` then re-validates the now-stored bytes by real content
+   sniffing (not just the declared MIME type — client-supplied type/size are never trusted), extracts
+   text (`pdf-parse` / `mammoth` / UTF-8), hashes it (SHA-256, for duplicate detection), and is
+   idempotent against retries (`Resume.storageKey` is unique; a repeat finalize for the same
+   object returns the original result instead of reprocessing).
 2. **Extraction** (`src/lib/ai/extraction.ts`): the raw text is sent to the model with a system
    prompt (`src/lib/ai/prompts/extraction.ts`) that treats it as untrusted data — any
    prompt-injection attempt inside the resume text is to be ignored, not followed — and asks for
@@ -150,8 +176,13 @@ requires a configured environment (see above) and is best verified manually agai
 
 ## Known limitations
 
-- **Upload size on Vercel**: this repo's upload route accepts up to 10 MB as specified, but
-  standard Vercel Serverless Functions cap request bodies below that for some plans. For reliably
-  large files in production, switch to `@vercel/blob/client`'s direct-from-browser upload flow.
+- **Orphaned pending uploads**: if a browser tab is closed between a successful direct-to-Blob
+  upload and the `finalize` call, the uploaded object is never cleaned up (it's inert — never
+  linked to a `Resume` row or visible to any user, and blocked from later reprocessing by
+  ownership checks — but it does consume storage). No scheduled sweep exists yet.
+- **Generation rate limit race**: `enforceGenerationRateLimit` counts existing `GenerationRun`
+  rows rather than atomically reserving a slot, so concurrent requests from the same user can
+  briefly exceed the per-minute cap. This is a soft cost guard, not a security boundary — see
+  ISSUE-13 in `docs/resume-formatting-audit.md` for the reproduction and recommended fix.
 - The editor's "Apply" always commits a new revision (protected by Undo/Reset) rather than offering
   a separate non-committing preview step.

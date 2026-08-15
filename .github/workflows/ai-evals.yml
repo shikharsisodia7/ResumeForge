@@ -1,0 +1,38 @@
+name: Live AI evals (manual)
+
+# Manually dispatched only — this workflow spends real OpenAI API credits and
+# must never run on a normal push/PR or be a required check. It exercises
+# scripts/run-ai-evals.ts against six fictional fixtures with a real model
+# call; see docs/resume-formatting-audit.md (ISSUE-10) for what it checks.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  ai-evals:
+    name: Run live extraction evals
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run live AI evaluation harness
+        env:
+          RUN_AI_EVALS: "true"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        run: npm run test:ai-evals

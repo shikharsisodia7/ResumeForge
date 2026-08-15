@@ -31,7 +31,7 @@ model Resume {
   title            String
   originalFilename String
   mimeType         String
-  storageKey       String
+  storageKey       String   @unique
   sourceText       String   @db.Text
   fileHash         String
   isProcessing     Boolean  @default(false)

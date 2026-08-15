@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # Dummy values: nothing in this job makes a live OpenAI/Auth0/Postgres/Blob
+  # call. Prisma client generation only reads the schema file; Next's build
+  # only needs these to exist so module-scope client construction
+  # (e.g. `new Auth0Client()`) doesn't throw during the build.
+  DATABASE_URL: "postgresql://ci:ci@localhost:5432/resumeforge_ci"
+  AUTH0_DOMAIN: "ci-placeholder.us.auth0.com"
+  AUTH0_CLIENT_ID: "ci-placeholder-client-id"
+  AUTH0_CLIENT_SECRET: "ci-placeholder-client-secret"
+  AUTH0_SECRET: "0000000000000000000000000000000000000000000000000000000000000"
+  APP_BASE_URL: "http://localhost:3100"
+  OPENAI_API_KEY: "sk-ci-placeholder"
+  OPENAI_MODEL: "gpt-4.1"
+  BLOB_READ_WRITE_TOKEN: "vercel_blob_rw_ci_placeholder"
+
+jobs:
+  test:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: npm run test:e2e
+
+      - name: Production build
+        run: npm run build

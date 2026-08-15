@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-export const uploadResumeSchema = z.object({
+export const finalizeUploadSchema = z.object({
+  pathname: z.string().min(1).max(500),
+  filename: z.string().min(1).max(255),
   title: z.string().trim().min(1, "Title is required").max(200),
 });
 

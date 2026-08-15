@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ApiError } from "@/lib/client/api";
-import { uploadResumeWithProgress } from "@/lib/client/upload-xhr";
+import { uploadAndFinalizeResume } from "@/lib/client/upload-resume";
 import { cn } from "@/lib/utils";
 
 type Stage = "idle" | "uploading" | "processing" | "done" | "error";
 
 const ACCEPTED = ".pdf,.docx,.txt";
 
-export function UploadClient() {
+export function UploadClient({ userId }: { userId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -47,14 +47,15 @@ export function UploadClient() {
     setStage("uploading");
     setProgress(0);
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("title", title.trim());
-
     try {
-      const result = await uploadResumeWithProgress(formData, (percent) => {
-        setProgress(percent);
-        if (percent >= 100) setStage("processing");
+      const result = await uploadAndFinalizeResume({
+        file,
+        title: title.trim(),
+        userId,
+        onProgress: (percent) => {
+          setProgress(percent);
+          if (percent >= 100) setStage("processing");
+        },
       });
       setStage("done");
       router.push(`/editor/${result.version.id}`);

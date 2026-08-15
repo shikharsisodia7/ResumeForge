@@ -116,7 +116,7 @@ The following checklist items were investigated and found already correctly impl
 - **Cross-user ownership isolation**: `requireOwnedResume`/`requireOwnedVersion`/`requireOwnedPrompt` (`src/lib/auth/ownership.ts`), covered by existing tests.
 - **Fact fabrication guard**: `src/lib/ai/fact-guard.ts`, covered by existing tests — rejects invented statistics and named entities not traceable to the source resume.
 
-### ISSUE-08b — Inconsistent ellipsis character in one placeholder string
+### ISSUE-08 — Inconsistent ellipsis character in one placeholder string
 
 - **Area**: `src/components/dashboard/duplicate-version-dialog.tsx`
 - **Severity**: Cosmetic
@@ -124,23 +124,56 @@ The following checklist items were investigated and found already correctly impl
 - **Status**: Fixed — changed to `…` for consistency.
 - **Coverage note**: No other spelling, grammar, punctuation, incomplete-sentence, or terminology-consistency issues were found across the full scan (35 error-message call sites, 39 toast calls, all component/page copy, README).
 
-### ISSUE-09 — Live production AI pipeline is blocked by exhausted OpenAI account credits (external, not a code defect)
-
-- **Area**: Production environment (`resumeforge1.vercel.app`), not application code
-- **Severity**: Critical for the live product, but external to this codebase
-- **Reproduction**: Uploaded a real synthetic `.txt` resume through the live, authenticated production UI (`/upload`). Extraction failed with: *"The AI couldn't produce a valid result for this request. Please try again."*
-- **Root cause**: Confirmed via Vercel's runtime error logs (`get_runtime_errors`, project `resumeforge`) — every recent `/api/resumes/upload` failure carries the same underlying LangChain/OpenAI error: `429 You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.` Both the initial structured-output call and the one automatic repair attempt fail identically, so `callStructured` correctly falls through to its sanitized user-facing error. This is a billing/account-balance issue on the connected OpenAI account, not a bug in the extraction code, prompt, or schema.
-- **Positive finding along the way**: The dashboard showed "No resumes yet" both before and after the failed upload — confirming `createFormattedVersion`'s error path does **not** leave an orphaned `Resume` or half-created `ResumeVersion` row when the AI call fails, exactly as the architecture intends.
-- **Status**: Not fixed — outside this codebase's control. Adding OpenAI credits is a billing action the account owner needs to take directly at the URL in the error message; I have not and will not attempt any payment/billing action myself.
-- **Impact on this pass**: This blocked live, end-to-end verification of upload → AI extraction → preview → PDF against a freshly-generated version in production (steps 2–13 of the requested manual trace). Everything not dependent on a live OpenAI call was still verified: the deterministic PDF-rendering tests (`render.test.ts`), the real-browser layout tests (`print-formatting.spec.ts`), the mocked AI-pipeline unit tests (schema/fact-guard/leak-guard/structured-call, none of which call a real model), and the production build/smoke test.
-
-### ISSUE-08 (root-caused and fixed) — Two auth e2e tests failed on a stale assumption about the redirect chain
+### ISSUE-09 (root-caused and fixed) — Two auth e2e tests failed on a stale assumption about the redirect chain
 
 - **Area**: `e2e/auth-and-landing.spec.ts` (test code only — no application/auth code was touched)
 - **Reproduction**: "visiting the dashboard/editor while signed out redirects to Auth0 login" asserted `toHaveURL(/\/auth\/login/)` after `page.goto()`.
 - **Root cause**: Against a real, fully-configured Auth0 tenant, an unauthenticated visit to a protected route is a three-hop redirect chain: `/dashboard` → app's own `/auth/login?returnTo=...` → Auth0's `/authorize` → Auth0's hosted `/u/login` (the page that actually renders). `page.goto()` only resolves once the browser finishes the *entire* chain and renders a page — which is Auth0's hosted login screen, not the app's transient `/auth/login` hop, which the browser is never "on" long enough for `toHaveURL` to observe. The test's assumption only ever would have held in a broken/unconfigured Auth0 setup. Confirmed via `git diff` that no application auth code (`src/proxy.ts`, `src/lib/auth0.ts`, `src/lib/auth/*`) was touched — the app's behavior was always correct.
 - **Fix**: Rewrote both tests to assert the actual security property that matters: (1) the protected page's content never rendered for a signed-out visitor, and (2) the app's own `/auth/login` redirect genuinely fired, verified by walking the response's redirect chain (`response.request().redirectedFrom()`) rather than checking the final URL.
 - **Status**: Fixed and verified against the real, live Auth0 tenant — all 4 tests in this file now pass (`npx playwright test e2e/auth-and-landing.spec.ts` → 4 passed).
+
+### ISSUE-10 — Live production AI pipeline was blocked by exhausted OpenAI account credits (external, not a code defect; now resolved)
+
+- **Area**: Production environment (`resumeforge1.vercel.app`), not application code
+- **Severity**: Was critical for the live product; external to this codebase
+- **Original finding (2026-08-08)**: A real synthetic `.txt` resume uploaded through the live, authenticated production UI failed extraction. Vercel's runtime error logs showed every `/api/resumes/upload` failure carrying the same LangChain/OpenAI error: `429 You have no credits remaining.` This was a billing/account-balance issue on the connected OpenAI account, not a bug in the extraction code, prompt, or schema.
+- **Positive finding along the way**: The dashboard showed "No resumes yet" both before and after the failed upload — confirming `createFormattedVersion`'s error path does **not** leave an orphaned `Resume` or half-created `ResumeVersion` row when the AI call fails, exactly as the architecture intends.
+- **Current status (2026-08-15)**: Re-ran the live evaluation harness against the same six fixtures with a funded key: `RUN_AI_EVALS=true npm run test:ai-evals` → **6/6 passed** (schema-valid 6/6, fact-preservation 6/6, hallucinations 0, clipping violations 0, model errors 0). The account was funded between the original finding and this pass; no code change was needed or made.
+- **Status**: Resolved (billing action taken by the account owner, outside this codebase).
+
+### ISSUE-11 — Playwright's e2e suite silently attaches to the wrong app when its port is already occupied
+
+- **Area**: `playwright.config.ts` (test infrastructure only — no application code)
+- **Severity**: High (produces dozens of confusing false-negative failures with zero diagnostic; wastes significant developer time misdiagnosing a phantom regression)
+- **Reproduction**: With an unrelated local project already bound to port 3100, `npx playwright test` reported **39 of 39 tests failing** — including basic auth-redirect checks that have no dependency on layout code. Inspecting a failure's `error-context.md` snapshot showed the page actually rendered was a completely unrelated project's marketing page, not ResumeForge, because `reuseExistingServer: !process.env.CI` treats "something answered on this port" as "the server is ready," with no check that it's actually this app.
+- **Root cause**: `webServer.reuseExistingServer` has no identity check by design — on a machine that runs many local Node dev servers in parallel, any of them can already own the configured port, and the entire suite then silently tests the wrong application.
+- **Fix**: Added `e2e/global-setup.ts` (wired via `playwright.config.ts`'s new `globalSetup` option), which calls `assertExpectedServer` (`src/lib/dev/assert-expected-server.ts`) to confirm the response at `baseURL` is actually ResumeForge's homepage before any test runs. A mismatch now throws one clear `WrongServerError` naming the problem and the fix, instead of 39 unrelated-looking failures.
+- **Status**: Fixed and verified — reproduced the exact failure mode with the real port collision (one clear error, confirmed), then re-ran the full suite against ResumeForge's own build on a free port: **39/39 passed**. Note this class of collision cannot occur in CI (GitHub Actions runners don't have other local projects running, and `reuseExistingServer` is forced off when `CI` is set), so it's a local-development reliability fix, not a CI-correctness one.
+- **Regression test**: `src/lib/dev/assert-expected-server.test.ts` — resolves for the real title, throws `WrongServerError` with a diagnostic message for a mismatched one.
+
+### ISSUE-12 — Upload route silently exceeds Vercel's hard request-body limit for files between ~4.5 MB and the advertised 10 MB
+
+- **Area**: `src/app/api/resumes/upload/route.ts` (now removed), `src/lib/files/constants.ts`
+- **Severity**: Critical (a real production failure mode, not a documentation gap)
+- **Reproduction**: The upload route called `request.formData()` then `file.arrayBuffer()` — buffering the entire multipart body into memory — before any size check ran. Confirmed via Vercel's own documentation (`/docs/functions/limitations`, fetched live during this pass) that **every** Vercel Functions plan (Hobby, Pro, Enterprise) caps request/response bodies at **4.5 MB**, returning a platform-level `413 FUNCTION_PAYLOAD_TOO_LARGE` before the function's own code — including its size-check logic — ever runs. This is not plan-dependent and cannot be raised by upgrading.
+- **Root cause**: The route trusted the entire file to arrive as a single request body to a Vercel Function. The app advertised and validated against a 10 MB limit (`MAX_FILE_SIZE_BYTES`) that the platform itself would never let a request that large reach.
+- **Fix**: Replaced the single-request upload with a direct-to-Blob client upload, per Vercel's own documented workaround for this exact limit:
+  1. `POST /api/resumes/upload/authorize` — issues a short-lived (10 min), size- and content-type-constrained client token via `@vercel/blob/client`'s `handleUpload`. The client proposes a pathname; the server independently re-derives the authenticated user from the session (never trusting the client's claim) and rejects any pathname outside `resumes/<that user's own id>/` (`src/lib/storage/upload-pathname.ts`).
+  2. The browser PUTs the file straight to Blob storage (`@vercel/blob/client`'s `upload()`), bypassing this app's own server entirely for the large transfer — the 4.5 MB cap never applies because no Vercel Function ever receives the file body.
+  3. `POST /api/resumes/finalize` — a small JSON call (pathname + filename + title, well under any body limit) that re-derives the authenticated user, re-checks the pathname belongs to them, fetches the now-stored bytes server-side, and runs the *exact same* real content-sniffing validation (`validateUploadedFile`) the old route did — client-supplied file type and size are never trusted, only what the server observes in the actual bytes.
+  - **Idempotency/races**: `Resume.storageKey` is now a `@unique` database column (migration `20260815211700_resume_storage_key_unique`). A finalize replay (retried request, double-click) for an already-processed object returns the original result instead of reprocessing; a genuine concurrent double-finalize race is resolved by letting the database's unique-constraint violation pick a winner, with the loser fetching and returning the winner's result rather than erroring.
+  - **Cleanup**: a blob that fails content validation at finalize is deleted immediately. A blob whose client never calls finalize at all (e.g. the tab closes mid-flow) is not swept — this is an accepted, documented gap (see Known limitations below), not a silent failure mode, since it costs storage but is inert (never linked to a `Resume` row, invisible to any user, and blocked from reprocessing by ownership + validation either way).
+- **Status**: Fixed. `MAX_FILE_SIZE_BYTES` stays at 10 MB — it's now enforced against real Blob-stored bytes, not a request the platform would have already rejected.
+- **Regression test**: `src/lib/storage/upload-pathname.test.ts` (5 tests — including a same-prefix-but-different-user "10 vs 1" collision case), `src/app/api/resumes/upload/authorize/route.test.ts` (3 tests — unauthenticated rejection, cross-user pathname rejection, valid-path token issuance), `src/app/api/resumes/finalize/route.test.ts` (6 tests — cross-user pathname rejection, missing-object 404, idempotent replay, content-mismatch rejection + cleanup, successful finalize, concurrent-race resolution).
+
+### ISSUE-13 (investigated, not fixed this pass) — Generation rate limit has a check-then-act race under concurrent requests
+
+- **Area**: `src/lib/rate-limit.ts`
+- **Severity**: Low-moderate (a soft cost/abuse guard, not a security boundary — worst case is a burst of AI calls modestly exceeding the intended per-minute cap, not unbounded abuse)
+- **Finding**: `enforceGenerationRateLimit` counts recent `GenerationRun` rows and throws if at/over the limit, but the row for *this* request isn't created until later, inside `createFormattedVersion`/the customize/tailor flows — several requests issued concurrently by the same user can all pass the count check before any of them has inserted its row, exceeding `maxPerWindow`.
+- **Root cause**: Check-then-act with no lock or atomic increment spanning the gap between the count and the eventual insert, which happens in a different function entirely (sometimes a different route).
+- **Why not fixed this pass**: A correct fix needs the check and the eventual `GenerationRun` insert to happen inside one atomically-locked unit (e.g. a Postgres advisory lock scoped per user, held from the check through the insert) — that means touching the transaction boundaries of every AI call site (`resume-format.ts`, customize, tailor), not just `rate-limit.ts`. Given this is a soft cost guard rather than a security boundary, doing that safely across three call sites deserved its own focused pass with dedicated concurrency tests, rather than a same-session bolt-on next to the upload-architecture rewrite above.
+- **Status**: Not fixed. Documented here as a known, reproducible gap with a concrete recommended fix (per-user advisory lock spanning check-through-insert) for the next pass.
 
 ## Fixture battery summary
 
