@@ -175,6 +175,16 @@ The following checklist items were investigated and found already correctly impl
 - **Why not fixed this pass**: A correct fix needs the check and the eventual `GenerationRun` insert to happen inside one atomically-locked unit (e.g. a Postgres advisory lock scoped per user, held from the check through the insert) — that means touching the transaction boundaries of every AI call site (`resume-format.ts`, customize, tailor), not just `rate-limit.ts`. Given this is a soft cost guard rather than a security boundary, doing that safely across three call sites deserved its own focused pass with dedicated concurrency tests, rather than a same-session bolt-on next to the upload-architecture rewrite above.
 - **Status**: Not fixed. Documented here as a known, reproducible gap with a concrete recommended fix (per-user advisory lock spanning check-through-insert) for the next pass.
 
+### ISSUE-14 — `auth-and-landing.spec.ts` asserted on a raw URL string, which could coincidentally match the query string it meant to exclude
+
+- **Area**: `e2e/auth-and-landing.spec.ts`
+- **Severity**: Medium (a false-negative test failure, not an application defect — but exactly the kind of thing that erodes trust in a CI gate)
+- **Reproduction**: Adding `.github/workflows/ci.yml` (this pass) surfaced it immediately: with a placeholder `AUTH0_DOMAIN` that doesn't resolve, the Auth0 SDK's discovery request 404s and `/auth/login` fails before ever reaching the real Auth0 tenant, leaving the browser on the app's own `http://localhost:3100/auth/login?returnTo=/dashboard`. The test's `await expect(page).not.toHaveURL(/\/dashboard$/)` failed — `/\/dashboard$/` matches the *entire URL string*, and `?returnTo=/dashboard` happens to make that string end in `/dashboard` too, even though the actual path is `/auth/login`.
+- **Root cause**: The regex was written to express "the protected route's path was never rendered" but was applied against the full URL (path + query) instead of the path alone, so it could match on the query string's *content* instead of the actual route.
+- **Fix**: Both assertions (`/dashboard`, `/editor/`) now check `new URL(page.url()).pathname` directly instead of regex-matching the whole URL string — correct regardless of what `returnTo` happens to contain.
+- **Status**: Fixed. Reproduced against a real, working Auth0 tenant (still passes — the browser reaches Auth0's hosted login page, whose pathname is obviously not `/dashboard`) and against the exact CI failure condition (local run with a placeholder, non-resolving `AUTH0_DOMAIN`) — both pass with the fix; the original regex reproducibly fails only in the latter.
+- **Regression test**: covered by the existing `e2e/auth-and-landing.spec.ts` assertions themselves (now pathname-based); no new test needed since these *are* the regression tests, now correctly written.
+
 ## Fixture battery summary
 
 32 fixtures in `src/fixtures/synthetic-resumes.ts`, spanning: grammar/typos,

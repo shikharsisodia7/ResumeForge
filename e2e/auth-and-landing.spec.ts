@@ -46,7 +46,11 @@ test("visiting the dashboard while signed out redirects through the app's login 
   const chain = redirectChainUrls(response!);
   expect(chain.some((url) => url.includes("/auth/login"))).toBe(true);
   // The protected page itself must never have rendered for a signed-out visitor.
-  await expect(page).not.toHaveURL(/\/dashboard$/);
+  // Checked against the URL's *pathname*, not the full string — the app's own
+  // /auth/login?returnTo=/dashboard hop legitimately contains "/dashboard" in
+  // its query string, which a raw string/regex match against the whole URL
+  // would misread as the protected route itself having rendered.
+  expect(new URL(page.url()).pathname).not.toBe("/dashboard");
   await expect(page.getByRole("heading", { name: /your resumes/i })).not.toBeVisible();
 });
 
@@ -55,7 +59,7 @@ test("visiting the editor while signed out redirects through the app's login rou
   expect(response).not.toBeNull();
   const chain = redirectChainUrls(response!);
   expect(chain.some((url) => url.includes("/auth/login"))).toBe(true);
-  await expect(page).not.toHaveURL(/\/editor\//);
+  expect(new URL(page.url()).pathname.startsWith("/editor/")).toBe(false);
 });
 
 test("the public prompt gallery API rejects unauthenticated requests", async ({ request }) => {
