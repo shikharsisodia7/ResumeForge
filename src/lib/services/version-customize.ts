@@ -4,6 +4,7 @@ import { runCustomization } from "@/lib/ai/customize";
 import { requireOwnedPrompt } from "@/lib/auth/ownership";
 import { prisma } from "@/lib/db";
 import { ConflictError } from "@/lib/errors";
+import { reserveGenerationRun } from "@/lib/rate-limit";
 import { sha256Hex } from "@/lib/files/hash";
 import { resumeContentSchema } from "@/lib/schemas/resume-content";
 import { resumeStyleSchema } from "@/lib/schemas/resume-style";
@@ -50,17 +51,20 @@ export async function customizeVersion(
     throw error;
   }
 
-  const run = await prisma.generationRun.create({
-    data: {
+  let run: { id: string };
+  try {
+    run = await reserveGenerationRun({
       userId,
       resumeId: version.resumeId,
       versionId: version.id,
       operation: "CUSTOMIZE",
       modelId: AI_MODEL_ID,
-      status: "PENDING",
       promptHash: sha256Hex(instructionText),
-    },
-  });
+    });
+  } catch (error) {
+    await prisma.resumeVersion.update({ where: { id: version.id }, data: { isProcessing: false } });
+    throw error;
+  }
 
   try {
     const baseContent = resumeContentSchema.parse(version.baseContentJson);

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Copy, FileText, Plus, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClassName } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -93,11 +93,9 @@ export function DashboardClient({ initialResumes }: { initialResumes: DashboardR
         title="No resumes yet"
         description="Upload a PDF, DOCX, or TXT resume to get an AI-organized, ATS-friendly first draft in seconds."
         action={
-          <Link href="/upload">
-            <Button>
-              <Plus className="size-4" aria-hidden="true" />
-              Upload a resume
-            </Button>
+          <Link href="/upload" className={buttonClassName()}>
+            <Plus className="size-4" aria-hidden="true" />
+            Upload a resume
           </Link>
         }
       />
@@ -107,11 +105,9 @@ export function DashboardClient({ initialResumes }: { initialResumes: DashboardR
   return (
     <div>
       <div className="mb-4 flex justify-end">
-        <Link href="/upload">
-          <Button>
-            <Plus className="size-4" aria-hidden="true" />
-            Upload a resume
-          </Button>
+        <Link href="/upload" className={buttonClassName()}>
+          <Plus className="size-4" aria-hidden="true" />
+          Upload a resume
         </Link>
       </div>
 

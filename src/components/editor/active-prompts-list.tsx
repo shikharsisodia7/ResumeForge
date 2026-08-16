@@ -1,8 +1,14 @@
 "use client";
 
-import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, KeyboardSensor, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import type { DragEndEvent } from "@dnd-kit/core";
-import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +26,14 @@ export function ActivePromptsList({
   onToggle: (versionPromptId: string, isActive: boolean) => void;
   busyId: string | null;
 }) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // Both sensors are required for the reorder handle to be keyboard-operable
+  // (Tab to focus it, Space to pick up, Arrow keys to move, Space to drop) —
+  // PointerSensor alone covers mouse/touch but leaves keyboard-only users
+  // with no way to reorder prompts at all, despite the handle's aria-label.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;

@@ -75,6 +75,7 @@ export function GalleryClient({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search shared prompts…"
+            aria-label="Search shared prompts"
             className="pl-9"
           />
         </div>

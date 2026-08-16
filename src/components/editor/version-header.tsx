@@ -5,7 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { ChevronLeft, Copy, Download, RotateCcw, Undo2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClassName } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DuplicateVersionDialog } from "@/components/dashboard/duplicate-version-dialog";
@@ -83,6 +83,7 @@ export function VersionHeader({
           {editingName ? (
             <Input
               autoFocus
+              aria-label="Version name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onBlur={commitName}
@@ -123,11 +124,9 @@ export function VersionHeader({
             <Copy className="size-3.5" aria-hidden="true" />
             Duplicate
           </Button>
-          <a href={pdfDownloadUrl(version.id)} download>
-            <Button size="sm">
-              <Download className="size-3.5" aria-hidden="true" />
-              Download PDF
-            </Button>
+          <a href={pdfDownloadUrl(version.id)} download className={buttonClassName("primary", "sm")}>
+            <Download className="size-3.5" aria-hidden="true" />
+            Download PDF
           </a>
         </div>
       </div>

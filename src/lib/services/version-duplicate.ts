@@ -3,6 +3,7 @@ import { AI_MODEL_ID } from "@/lib/ai/model";
 import { runTailoring } from "@/lib/ai/tailor";
 import { prisma } from "@/lib/db";
 import { ConflictError } from "@/lib/errors";
+import { reserveGenerationRun } from "@/lib/rate-limit";
 import { sha256Hex } from "@/lib/files/hash";
 import { resumeContentSchema } from "@/lib/schemas/resume-content";
 import { resumeStyleSchema } from "@/lib/schemas/resume-style";
@@ -52,16 +53,19 @@ export async function duplicateVersion(params: {
     throw new ConflictError("This resume is already being processed");
   }
 
-  const run = await prisma.generationRun.create({
-    data: {
+  let run: { id: string };
+  try {
+    run = await reserveGenerationRun({
       userId,
       resumeId: sourceVersion.resumeId,
       operation: "TAILOR",
       modelId: AI_MODEL_ID,
-      status: "PENDING",
       promptHash: sha256Hex(jobDescription),
-    },
-  });
+    });
+  } catch (error) {
+    await prisma.resume.update({ where: { id: sourceVersion.resumeId }, data: { isProcessing: false } });
+    throw error;
+  }
 
   try {
     const { content } = await runTailoring({

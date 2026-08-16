@@ -3,6 +3,7 @@ import { runExtraction } from "@/lib/ai/extraction";
 import { AI_MODEL_ID } from "@/lib/ai/model";
 import { prisma } from "@/lib/db";
 import { ConflictError } from "@/lib/errors";
+import { reserveGenerationRun } from "@/lib/rate-limit";
 import { DEFAULT_RESUME_STYLE } from "@/lib/schemas/resume-style";
 import { sha256Hex } from "@/lib/files/hash";
 
@@ -20,16 +21,19 @@ export async function createFormattedVersion(resume: Resume, userId: string): Pr
     throw new ConflictError("This resume is already being processed");
   }
 
-  const run = await prisma.generationRun.create({
-    data: {
+  let run: { id: string };
+  try {
+    run = await reserveGenerationRun({
       userId,
       resumeId: resume.id,
       operation: "FORMAT",
       modelId: AI_MODEL_ID,
-      status: "PENDING",
       promptHash: sha256Hex(resume.sourceText),
-    },
-  });
+    });
+  } catch (error) {
+    await prisma.resume.update({ where: { id: resume.id }, data: { isProcessing: false } });
+    throw error;
+  }
 
   try {
     const content = await runExtraction(resume.sourceText);

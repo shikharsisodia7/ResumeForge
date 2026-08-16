@@ -50,6 +50,9 @@ export const POST = apiRoute(async (request) => {
     return NextResponse.json(alreadyFinalized);
   }
 
+  // Best-effort early exit for an already-limited user, so we don't spend
+  // time reading and validating the blob before rejecting. Not the sole
+  // gate — createFormattedVersion below enforces the limit atomically.
   await enforceGenerationRateLimit(user.id);
 
   const stored = await readStorageObject(body.pathname);

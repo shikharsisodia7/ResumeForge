@@ -106,6 +106,7 @@ export function EditorClient({
         <button
           type="button"
           onClick={() => setMobileTab("edit")}
+          aria-pressed={mobileTab === "edit"}
           className={cn(
             "flex-1 rounded px-3 py-1.5 text-sm font-medium",
             mobileTab === "edit" ? "bg-card shadow-sm" : "text-muted-foreground",
@@ -116,6 +117,7 @@ export function EditorClient({
         <button
           type="button"
           onClick={() => setMobileTab("preview")}
+          aria-pressed={mobileTab === "preview"}
           className={cn(
             "flex-1 rounded px-3 py-1.5 text-sm font-medium",
             mobileTab === "preview" ? "bg-card shadow-sm" : "text-muted-foreground",

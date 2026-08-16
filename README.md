@@ -59,7 +59,8 @@ User 1─* Resume 1─* ResumeVersion *─* CustomPrompt   (via VersionPrompt: o
 
 Copy `.env.example` to `.env` and fill in real values — see that file for the full list
 (`DATABASE_URL`, `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`,
-`APP_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `BLOB_READ_WRITE_TOKEN`). Never commit `.env`.
+`APP_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `BLOB_READ_WRITE_TOKEN`, `CRON_SECRET`).
+Never commit `.env`.
 
 ### Auth0 setup
 
@@ -98,24 +99,28 @@ npm run dev                 # http://localhost:3000
 
 ## Testing
 
-`npm run test` runs the Vitest suite (84 tests): file validation (type sniffing, size limits,
+`npm run test` runs the Vitest suite (94 tests): file validation (type sniffing, size limits,
 extension/content mismatch), text normalization, structured AI-output validation, style-patch
 validation (closed vocabulary, range checks, `sectionOrder` permutation), reset behavior, the
 fabrication guard, the structured-output repair/retry path, cross-user ownership isolation
 (`requireOwnedResume`/`requireOwnedVersion`/`requireOwnedPrompt`), the gallery prompt-copy
 route (independent copy, duplicate-copy idempotency, self-copy rejection), the direct-to-Blob
 upload flow (cross-user pathname rejection, idempotent finalize replay, concurrent-finalize race
-resolution, content-mismatch cleanup), and the e2e webServer identity check
-(`src/lib/dev/assert-expected-server.ts`). All external services (Prisma, the AI model) are
-mocked at the module boundary — no live database or API key is needed to run this suite.
+resolution, content-mismatch cleanup), the atomic generation-rate-limit reservation (lock
+ordering, bounded retry, no spurious rejection on a transient miss), the orphaned-upload cleanup
+cron (auth gate, age-threshold filtering, partial-failure reporting), and the e2e webServer
+identity check (`src/lib/dev/assert-expected-server.ts`). All external services (Prisma, the AI
+model) are mocked at the module boundary — no live database or API key is needed to run this
+suite.
 
-`npm run test:e2e` (Playwright, 39 tests) covers what's verifiable without live Auth0/Postgres/
+`npm run test:e2e` (Playwright, 41 tests) covers what's verifiable without live Auth0/Postgres/
 OpenAI credentials: the landing page renders for signed-out visitors, every protected page/API
-route correctly redirects to/rejects with Auth0 login when signed out, and real-Chromium layout
-regression checks (right-edge clipping, print isolation) against all 32 synthetic fixtures. Run
-`npx playwright install` once before the first run. A full authenticated upload → format →
-customize → PDF walkthrough requires a configured environment (see above) and is best verified
-manually against it.
+route correctly redirects to/rejects with Auth0 login when signed out, real-Chromium layout
+regression checks (right-edge clipping, print isolation) against all 32 synthetic fixtures, and
+automated `axe-core` accessibility checks (zero violations) against every page reachable without
+authentication. Run `npx playwright install` once before the first run. A full authenticated
+upload → format → customize → PDF walkthrough requires a configured environment (see above) and
+is best verified manually against it.
 
 `RUN_AI_EVALS=true npm run test:ai-evals` runs a separate, opt-in live-model harness (6 fixtures
 against the real OpenAI extraction prompt) — costs real API tokens, so it never runs in CI or on
@@ -140,7 +145,9 @@ It reads `OPENAI_API_KEY`/`OPENAI_MODEL` from GitHub Actions Secrets, never from
    locally, or set them directly in the Vercel dashboard.
 3. Set the remaining env vars in the Vercel dashboard (Production + Preview):
    `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_SECRET`, `APP_BASE_URL`
-   (your `https://…vercel.app` or custom domain), `OPENAI_API_KEY`, `OPENAI_MODEL`.
+   (your `https://…vercel.app` or custom domain), `OPENAI_API_KEY`, `OPENAI_MODEL`, and
+   `CRON_SECRET` (any random string — protects the nightly cleanup cron; see Scheduled cleanup
+   below).
 4. Add the production callback/logout URLs to your Auth0 application (see Auth0 setup above).
 5. Apply migrations against the production database: `npx prisma migrate deploy` (with
    `DATABASE_URL` pointed at production — run this from CI/CD or locally before/after the first
@@ -174,15 +181,19 @@ It reads `OPENAI_API_KEY`/`OPENAI_MODEL` from GitHub Actions Secrets, never from
    server-side with `@react-pdf/renderer` — deterministic, selectable text, ownership-checked
    before any data is read.
 
+## Scheduled cleanup
+
+If a browser tab is closed between a successful direct-to-Blob upload and the `finalize` call,
+the uploaded object is orphaned — inert (never linked to a `Resume` row, never visible to any
+user, blocked from reprocessing by ownership checks) but still consuming storage. A Vercel Cron
+Job (`vercel.json`, `GET /api/cron/cleanup-orphaned-uploads`, nightly) sweeps the resume-uploads
+prefix and deletes anything with no matching `Resume.storageKey` that's older than 24 hours (a
+generous margin past any legitimate upload-to-finalize gap, so nothing mid-flight is ever
+touched). The route checks `Authorization: Bearer $CRON_SECRET` — set `CRON_SECRET` in the
+Vercel dashboard (Production, Preview, and Development) for both the cron trigger and local
+testing.
+
 ## Known limitations
 
-- **Orphaned pending uploads**: if a browser tab is closed between a successful direct-to-Blob
-  upload and the `finalize` call, the uploaded object is never cleaned up (it's inert — never
-  linked to a `Resume` row or visible to any user, and blocked from later reprocessing by
-  ownership checks — but it does consume storage). No scheduled sweep exists yet.
-- **Generation rate limit race**: `enforceGenerationRateLimit` counts existing `GenerationRun`
-  rows rather than atomically reserving a slot, so concurrent requests from the same user can
-  briefly exceed the per-minute cap. This is a soft cost guard, not a security boundary — see
-  ISSUE-13 in `docs/resume-formatting-audit.md` for the reproduction and recommended fix.
 - The editor's "Apply" always commits a new revision (protected by Undo/Reset) rather than offering
   a separate non-committing preview step.

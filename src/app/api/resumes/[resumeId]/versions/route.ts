@@ -4,7 +4,6 @@ import { requireOwnedResume } from "@/lib/auth/ownership";
 import { apiRoute } from "@/lib/api/handler";
 import { prisma } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
-import { enforceGenerationRateLimit } from "@/lib/rate-limit";
 import { createVersionSchema } from "@/lib/schemas/requests";
 import { duplicateVersion } from "@/lib/services/version-duplicate";
 
@@ -20,10 +19,10 @@ export const POST = apiRoute(async (request, ctx) => {
   });
   if (!sourceVersion) throw new NotFoundError("Source version not found");
 
-  if (body.jobDescription) {
-    await enforceGenerationRateLimit(user.id);
-  }
-
+  // When a job description is present, duplicateVersion runs a tailoring
+  // pass and enforces the rate limit atomically itself (reserveGenerationRun)
+  // — a separate check-then-act call here would race against concurrent
+  // requests instead of closing the gap.
   const version = await duplicateVersion({
     sourceVersion: { ...sourceVersion, resume },
     userId: user.id,
