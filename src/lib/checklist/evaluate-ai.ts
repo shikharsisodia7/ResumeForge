@@ -34,6 +34,17 @@ export async function evaluateAiJudgedChecklist(content: ResumeContent, sourceTe
     // runChecklistEvaluation's merge can never hit a missing id and throw an
     // unhandled 500 out of the API route.
     const byId = new Map(verdict.items.map((i) => [i.id, i]));
+    const missingIds = AI_JUDGED_ITEM_IDS.filter((id) => !byId.has(id));
+    if (missingIds.length > 0) {
+      // Log it rather than filling silently: a model that duplicates ids on
+      // every run would otherwise warn the same items forever with nothing in
+      // the logs to explain why. This is a prompt/model problem to chase, not
+      // an outage, so it stays out of `degraded` (see below).
+      console.error("[checklist] AI verdict omitted item ids, filling them with warnings", {
+        modelId: AI_MODEL_ID,
+        missingIds,
+      });
+    }
     const items: ChecklistItemResult[] = AI_JUDGED_ITEM_IDS.map(
       (id) =>
         byId.get(id) ?? {

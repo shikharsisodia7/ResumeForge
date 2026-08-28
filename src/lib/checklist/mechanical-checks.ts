@@ -338,31 +338,58 @@ function checkNoRawMarkup(content: ResumeContent): ChecklistItemResult {
 }
 
 // --- SAFE-003 ---
-// UTF-8 bytes re-decoded as CP1252 ("mojibake"). Two families matter:
-//  1. Latin-1 range (U+0080-U+00FF): the bytes C3 xx decode to U+00C3 followed
-//     by a character in U+0080-U+00BF - e.g. "Jose" with an acute e becomes
-//     "Jos" + U+00C3 + U+00A9.
-//  2. General punctuation (U+2000-U+20FF): the bytes E2 80 xx decode to
-//     U+00E2 + U+20AC + whatever CP1252 maps the third byte to. For every
-//     common case that third character is a PRINTABLE character, not a C1
-//     control, so the previous trailing class of [\x80-\x9F] could never
-//     match real smart quotes or dashes - the most frequent mojibake in real
-//     resume text. Third-byte mapping (source char -> trailing char):
+// UTF-8 bytes re-decoded as CP1252 ("mojibake").
+//
+// Every UTF-8 continuation byte is 0x80-0xBF, so in EVERY mojibake sequence
+// the trailing character is CP1252's image of some byte in that range. That
+// image is the single source of truth below, shared by all three families
+// rather than hand-enumerated per case (the bug this replaced: each family
+// had its own partial class, so whichever characters the author happened not
+// to think of silently passed):
+//   0x80-0x9F -> mostly PRINTABLE characters, not C1 controls. This is the
+//     trap. CP1252 maps this range to punctuation (quotes, dashes, bullet,
+//     ellipsis, trademark...), so a trailing class of [\x80-\x9F] alone could
+//     never match real smart quotes, dashes or bullets - by far the most
+//     frequent mojibake in real resume text. \x80-\x9F is still retained for
+//     the bytes CP1252 leaves undefined, which decoders surface as their raw
+//     C1 control codepoints (U+0080-U+009F) — real resume text never
+//     contains a literal C1 control, so this whole range is safe to flag.
+//   0xA0-0xBF -> U+00A0-U+00BF, identical to Latin-1.
+//
+// Three lead sequences are handled (not an exhaustive list of every mojibake
+// family — e.g. a mangled euro sign, E2 82 AC, still slips through, same as
+// before this change):
+//  1. C2 xx -> U+00C2 + trail. Non-breaking space, (c), (r), degree sign:
+//     "50" + U+00C2 + U+00A0 + "k".
+//  2. C3 xx -> U+00C3 + trail. Accented Latin letters - "Jose" with an acute
+//     e becomes "Jos" + U+00C3 + U+00A9, and an uppercase E-acute (C3 89)
+//     becomes U+00C3 + U+2030.
+//  3. E2 80 xx -> U+00E2 + U+20AC + trail. General punctuation, e.g.
 //       U+2019 right single quote (E2 80 99) -> U+2122   <- most common
 //       U+2018 left single quote  (E2 80 98) -> U+02DC
 //       U+201C left double quote  (E2 80 9C) -> U+0153
-//       U+201D right double quote (E2 80 9D) -> U+009D (undefined in CP1252)
+//       U+2022 bullet             (E2 80 A2) -> U+00A2
 //       U+2013 en dash            (E2 80 93) -> U+201C
 //       U+2014 em dash            (E2 80 94) -> U+201D
 //       U+2026 ellipsis           (E2 80 A6) -> U+00A6
-//     \x80-\x9F is retained for the bytes CP1252 leaves undefined (0x81,
-//     0x8D, 0x8F, 0x90, 0x9D), which decoders surface as raw C1 controls.
+//
 // U+FFFD is the replacement character a lossy decode leaves behind. Every
 // character below is written as an escape on purpose: the pattern is made
 // entirely of look-alike glyphs, so literals here would be unreadable and
 // trivially corrupted by any tool that re-encodes this file.
-const MOJIBAKE_PATTERN =
-  /\u00C3[\x80-\xBF]|\u00E2\u20AC[\x80-\x9F\u00A6\u0153\u02DC\u2013\u2014\u2018\u2019\u201C\u201D\u2122]|\uFFFD/;
+//
+// False-positive trade-off: an uppercase Ã/Â immediately followed by a
+// smart-punctuation character with no space between it (e.g. an all-caps
+// Portuguese word ending in "Ã" right before an em dash or ellipsis) would
+// also match. That combination is rare in real prose, and there is no way to
+// catch genuine mojibake like "Ã‰" (mangled É) without accepting it — real
+// text with an accented capital is followed by a letter or a space, not
+// smart punctuation, in the overwhelming majority of cases.
+const CP1252_TRAIL =
+  "[\\x80-\\x9F\\u00A0-\\u00BF\\u0152\\u0153\\u0160\\u0161\\u0178\\u017D\\u017E\\u0192\\u02C6\\u02DC\\u2013\\u2014\\u2018\\u2019\\u201A\\u201C\\u201D\\u201E\\u2020\\u2021\\u2022\\u2026\\u2030\\u2039\\u203A\\u20AC\\u2122]";
+const MOJIBAKE_PATTERN = new RegExp(
+  `[\\u00C2\\u00C3]${CP1252_TRAIL}|\\u00E2\\u20AC${CP1252_TRAIL}|\\uFFFD`,
+);
 function checkUnicodeIntegrity(content: ResumeContent): ChecklistItemResult {
   const hit = stringFields(content).find((field) => MOJIBAKE_PATTERN.test(field));
   return hit

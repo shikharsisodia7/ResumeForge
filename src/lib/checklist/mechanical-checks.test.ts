@@ -180,4 +180,49 @@ describe("evaluateMechanicalChecklist — SAFE-003 mojibake", () => {
   it("SAFE-003: still passes clean, correctly-encoded accents, smart quotes and dashes", async () => {
     expect(await safe003ForSummary(CLEAN_UNICODE)).toBe("passed");
   });
+
+  // The cases below pin the trailing characters CP1252 maps to PRINTABLE
+  // characters rather than C1 controls - the whole family a [\x80-\x9F]
+  // trailing class cannot reach.
+
+  // U+2018 left single quote is E2 80 98; CP1252 reads 0x98 as U+02DC.
+  const MOJIBAKE_LEFT_SINGLE = "Ran the \u00E2\u20AC\u02DCgrowth pod\u00E2\u20AC\u2122 pilot.";
+  // U+201C left double quote is E2 80 9C; CP1252 reads 0x9C as U+0153.
+  const MOJIBAKE_LEFT_DOUBLE = "Shipped the \u00E2\u20AC\u0153one-click apply\u00E2\u20AC\u009D flow.";
+  // U+2022 bullet is E2 80 A2; CP1252 reads 0xA2 as U+00A2. Bullets are the
+  // single most common non-ASCII character in a resume.
+  const MOJIBAKE_BULLET = "\u00E2\u20AC\u00A2 Cut onboarding time by 40%.";
+  // U+00C9 uppercase E-acute is C3 89; CP1252 reads 0x89 as U+2030, so this
+  // is missed by a C3 alternative whose trailing class stops at Latin-1.
+  const MOJIBAKE_UPPER_ACCENT = "JOS\u00C3\u2030 RAMIREZ, PRINCIPAL ENGINEER";
+  // U+00A0 non-breaking space is C2 A0 - the C2 lead family entirely.
+  const MOJIBAKE_NBSP = "Reduced cloud spend by \u00C2\u00A050k across three teams.";
+  // Legitimate uppercase accented prose. Every accented capital here is
+  // followed by an ASCII letter, so no alternative can fire.
+  const CLEAN_UPPERCASE = "Led the S\u00C3O PAULO expansion and the \u00C2ge d'Or rebrand.";
+
+  // Accepted false-positive trade-off, documented rather than left implicit:
+  // an uppercase \u00C3/\u00C2 directly followed by smart punctuation (no space) also
+  // matches. This is rare in real prose and unavoidable without missing
+  // genuine "\u00C3\u2030"-style mojibake \u2014 see the comment above MOJIBAKE_PATTERN.
+  const ACCEPTED_FALSE_POSITIVE = "The AMANH\u00C3\u2026 campaign launches Monday.";
+
+  it("SAFE-003: fails on smart-quote and bullet mojibake in a summary", async () => {
+    expect(await safe003ForSummary(MOJIBAKE_LEFT_SINGLE)).toBe("failed");
+    expect(await safe003ForSummary(MOJIBAKE_LEFT_DOUBLE)).toBe("failed");
+    expect(await safe003ForSummary(MOJIBAKE_BULLET)).toBe("failed");
+  });
+
+  it("SAFE-003: fails on C3 and C2 lead sequences past the Latin-1 trailing range", async () => {
+    expect(await safe003ForSummary(MOJIBAKE_UPPER_ACCENT)).toBe("failed");
+    expect(await safe003ForSummary(MOJIBAKE_NBSP)).toBe("failed");
+  });
+
+  it("SAFE-003: does not fire on legitimate uppercase accented prose", async () => {
+    expect(await safe003ForSummary(CLEAN_UPPERCASE)).toBe("passed");
+  });
+
+  it("SAFE-003: accepts the rare false positive of an uppercase Ã/Â directly before smart punctuation", async () => {
+    expect(await safe003ForSummary(ACCEPTED_FALSE_POSITIVE)).toBe("failed");
+  });
 });
