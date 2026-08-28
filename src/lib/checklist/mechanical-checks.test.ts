@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { RESUME_FIXTURES, fixtureById } from "@/fixtures/synthetic-resumes";
 import { DEFAULT_RESUME_STYLE } from "@/lib/schemas/resume-style";
 import { renderResumePdf } from "@/lib/pdf/render";
-import { inspectPdf } from "@/lib/pdf/inspect";
+import { inspectPdf, type PdfInspection } from "@/lib/pdf/inspect";
 import { evaluateMechanicalChecklist, type ChecklistItemResult } from "@/lib/checklist/mechanical-checks";
+import { MECHANICAL_ITEM_IDS } from "@/lib/checklist/definitions";
 
 async function runFor(fixtureId: string) {
   const { content, styleOverrides } = fixtureById(fixtureId);
@@ -32,6 +33,9 @@ describe("evaluateMechanicalChecklist", () => {
       const results = await runFor(fixture.id);
       const ids = results.map((r) => r.id);
       expect(new Set(ids).size, `fixture ${fixture.id} has duplicate result ids`).toBe(ids.length);
+      expect([...ids].sort(), `fixture ${fixture.id} does not cover exactly MECHANICAL_ITEM_IDS`).toEqual(
+        [...MECHANICAL_ITEM_IDS].sort(),
+      );
     }
   });
 
@@ -92,5 +96,41 @@ describe("evaluateMechanicalChecklist — per-item regression coverage", () => {
 
   it("FACT-003: a long URL with query params is preserved intact", async () => {
     expect(statusOf(await runFor("12-long-url-and-email"), "FACT-003")).toBe("passed");
+  });
+});
+
+describe("evaluateMechanicalChecklist — FACT-003 negative case", () => {
+  it("FACT-003: fails when a link is genuinely missing from the rendered PDF, not just wrap-hyphenated", async () => {
+    const { content, styleOverrides } = fixtureById("12-long-url-and-email");
+    const style = { ...DEFAULT_RESUME_STYLE, ...styleOverrides };
+    const pdfBuffer = await renderResumePdf(content, style);
+    // Hand-built inspection standing in for "what actually got rendered":
+    // its text has no trace of the fixture's portfolio URL at all, i.e. a
+    // genuinely broken/dropped link — as opposed to the wrap-hyphen artifact
+    // @react-pdf/renderer introduces for long URLs (covered by the positive
+    // test above, which still exercises the real renderer/inspector). The
+    // insertion-tolerant match must still fail this, since none of the
+    // link's characters are actually present, real hyphen or not.
+    const brokenInspection: PdfInspection = {
+      pageCount: 1,
+      pages: [
+        {
+          pageNumber: 1,
+          widthPt: 612,
+          heightPt: 792,
+          items: [],
+          text: "Jordan Alvarez Software Engineer jordan.alvarez+resume-2026-applications@example-mail-provider.com",
+        },
+      ],
+    };
+    const results = await evaluateMechanicalChecklist({
+      content,
+      style,
+      sourceText: "irrelevant for these assertions",
+      resume: { mimeType: "application/pdf" },
+      pdfBuffer,
+      inspection: brokenInspection,
+    });
+    expect(statusOf(results, "FACT-003")).toBe("failed");
   });
 });

@@ -293,12 +293,19 @@ function isValidUrl(raw: string): boolean {
 // "words" (a URL with no spaces is exactly that) by inserting a real "-"
 // character at the wrap point — e.g. "jordan-alvarez-portfolio.example.com"
 // can render as "jor-dan-alvarez-portfolio.example.com". That inserted
-// hyphen is a wrap artifact, not a content change, so link comparison
-// strips hyphens in addition to whitespace; stripping the same character
-// class from both sides can only make the match more permissive to that one
-// known artifact, never hide a link whose actual character content changed.
-function stripLinkNoise(s: string): string {
-  return s.replace(/[\s-]+/g, "");
+// hyphen (or a whitespace/line break at a wrap point) is a rendering
+// artifact, not a content change, so it must be tolerated — but only as an
+// INSERTION between two real link characters, never as a way to skip a
+// character the link actually needs. Build a regex requiring every
+// character of the link to appear, in order, allowing only whitespace/
+// hyphens to be inserted between consecutive characters: a genuinely
+// missing or substituted character can never be masked by this, since the
+// separator only ever adds characters, never removes the ones already
+// required literally in the pattern.
+function linkPattern(link: string): RegExp {
+  return new RegExp(
+    [...link].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("[\\s-]*"),
+  );
 }
 function checkLinksPreserved(content: ResumeContent, inspection: PdfInspection): ChecklistItemResult {
   const links = [
@@ -306,10 +313,10 @@ function checkLinksPreserved(content: ResumeContent, inspection: PdfInspection):
     ...content.projects.map((p) => p.link).filter((l): l is string => Boolean(l)),
     ...content.certifications.map((c) => c.credentialUrl).filter((l): l is string => Boolean(l)),
   ];
-  const flatPdfText = stripLinkNoise(fullText(inspection));
+  const text = fullText(inspection);
   for (const link of links) {
     if (!isValidUrl(link)) return bad("FACT-003", `"${link}" is not a valid URL.`);
-    if (!flatPdfText.includes(stripLinkNoise(link))) {
+    if (!linkPattern(link).test(text)) {
       return bad("FACT-003", `"${link}" does not appear intact in the rendered PDF.`);
     }
   }
@@ -331,7 +338,7 @@ function checkNoRawMarkup(content: ResumeContent): ChecklistItemResult {
 }
 
 // --- SAFE-003 ---
-const MOJIBAKE_PATTERN = /Ã[\x80-\xBF]|â€[\x80-\x9F]|�/;
+const MOJIBAKE_PATTERN = /Ã[\x80-\xBF]|â€[\x80-\x9F]|\uFFFD/;
 function checkUnicodeIntegrity(content: ResumeContent): ChecklistItemResult {
   const hit = stringFields(content).find((field) => MOJIBAKE_PATTERN.test(field));
   return hit
