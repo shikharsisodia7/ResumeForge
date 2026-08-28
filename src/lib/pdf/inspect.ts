@@ -1,13 +1,24 @@
-import { createRequire } from "node:module";
-import { dirname } from "node:path";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { GlobalWorkerOptions, getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 
-const require = createRequire(import.meta.url);
+// Deliberately NOT `require.resolve("pdfjs-dist/...")`: Turbopack statically
+// intercepts any `require.resolve` call whose argument is a literal module
+// specifier, and — because pdfjs-dist's legacy build files are ESM (.mjs),
+// which Turbopack refuses to treat as an externalizable CJS `require()` —
+// falls back to substituting its own internal numeric module id for the
+// resolved path instead of a real path string. That crashes `pathToFileURL`
+// at build time in any server route that imports this module (first hit by
+// the checklist route in Task 13; no server route reached this file before
+// that — `inspect.ts` was previously exercised only by Vitest, a plain Node
+// process Turbopack never touches). Building the path with plain `path.join`
+// against `process.cwd()` involves no module specifier for Turbopack to
+// intercept, so it always yields a real filesystem string.
+const PDFJS_ROOT = join(process.cwd(), "node_modules", "pdfjs-dist");
 // Windows resolves this to a bare "C:\..." path, which the ESM loader
 // rejects outright — it needs a proper file:// URL.
 GlobalWorkerOptions.workerSrc = pathToFileURL(
-  require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs"),
+  join(PDFJS_ROOT, "legacy/build/pdf.worker.mjs"),
 ).href;
 
 // Without this, pdf.js falls back to its own metric approximations for
@@ -19,7 +30,7 @@ GlobalWorkerOptions.workerSrc = pathToFileURL(
 // which (unlike the worker's `new Worker(url)`) rejects "file://" URL
 // strings as literal filenames — so this must stay a plain OS path,
 // not pathToFileURL(...).href like workerSrc above.
-const STANDARD_FONT_DATA_URL = `${dirname(require.resolve("pdfjs-dist/package.json"))}/standard_fonts/`;
+const STANDARD_FONT_DATA_URL = join(PDFJS_ROOT, "standard_fonts") + "/";
 
 export interface PdfTextItem {
   text: string;
