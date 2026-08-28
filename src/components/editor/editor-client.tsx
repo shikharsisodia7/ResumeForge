@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { ActivePromptsList } from "@/components/editor/active-prompts-list";
+import { ChecklistPanel } from "@/components/editor/checklist-panel";
 import { CustomizePanel } from "@/components/editor/customize-panel";
 import { DocumentPreview } from "@/components/editor/document-preview";
 import { VersionHeader } from "@/components/editor/version-header";
@@ -30,7 +31,7 @@ export function EditorClient({
   const [version, setVersion] = useState(initialVersion);
   const [activePrompts, setActivePrompts] = useState(initialActivePrompts);
   const [savedPrompts, setSavedPrompts] = useState(initialSavedPrompts);
-  const [mobileTab, setMobileTab] = useState<"edit" | "preview">("edit");
+  const [mobileTab, setMobileTab] = useState<"edit" | "preview" | "check">("edit");
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [pageCount, setPageCount] = useState<number | null>(null);
 
@@ -125,33 +126,52 @@ export function EditorClient({
         >
           Preview
         </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab("check")}
+          aria-pressed={mobileTab === "check"}
+          className={cn(
+            "flex-1 rounded px-3 py-1.5 text-sm font-medium",
+            mobileTab === "check" ? "bg-card shadow-sm" : "text-muted-foreground",
+          )}
+        >
+          Check
+        </button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
-        <div className={cn("space-y-4", mobileTab !== "edit" && "hidden lg:block")}>
-          <Card>
-            <CardContent className="pt-6">
-              <CustomizePanel
-                versionId={version.id}
-                savedPrompts={savedPrompts}
-                onApplied={(updated) => {
-                  setVersion(updated);
-                  refreshVersionPrompts();
-                }}
-                onPromptSaved={refreshSavedPrompts}
-              />
-            </CardContent>
-          </Card>
+        <div className={cn("space-y-4", mobileTab === "preview" && "hidden lg:block")}>
+          <div className={cn("space-y-4", mobileTab === "check" && "hidden lg:block")}>
+            <Card>
+              <CardContent className="pt-6">
+                <CustomizePanel
+                  versionId={version.id}
+                  savedPrompts={savedPrompts}
+                  onApplied={(updated) => {
+                    setVersion(updated);
+                    refreshVersionPrompts();
+                  }}
+                  onPromptSaved={refreshSavedPrompts}
+                />
+              </CardContent>
+            </Card>
 
-          <Card>
+            <Card>
+              <CardContent className="pt-6">
+                <h3 className="mb-3 text-sm font-semibold">Active prompts</h3>
+                <ActivePromptsList
+                  versionPrompts={activePrompts}
+                  onReorder={handleReorder}
+                  onToggle={handleToggle}
+                  busyId={togglingId}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className={cn(mobileTab !== "check" && "hidden lg:block")}>
             <CardContent className="pt-6">
-              <h3 className="mb-3 text-sm font-semibold">Active prompts</h3>
-              <ActivePromptsList
-                versionPrompts={activePrompts}
-                onReorder={handleReorder}
-                onToggle={handleToggle}
-                busyId={togglingId}
-              />
+              <ChecklistPanel versionId={version.id} revision={version.revision} />
             </CardContent>
           </Card>
         </div>
