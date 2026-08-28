@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:ai-evals": "tsx scripts/run-ai-evals.ts",
+    "test:checklist-evals": "tsx scripts/run-checklist-evals.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",

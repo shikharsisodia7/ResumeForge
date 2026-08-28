@@ -36,3 +36,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
         run: npm run test:ai-evals
+
+      - name: Run live checklist evaluation harness
+        env:
+          RUN_AI_EVALS: "true"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+        run: npm run test:checklist-evals
