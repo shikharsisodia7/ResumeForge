@@ -1,4 +1,5 @@
 import type {
+  ChecklistRunView,
   GalleryPromptItem,
   PromptItem,
   ResumeSummary,
@@ -84,6 +85,12 @@ export const pdfDownloadUrl = (versionId: string) => `/api/versions/${versionId}
 
 export const getPdfPageCount = (versionId: string) =>
   apiFetch<{ pageCount: number }>(`/api/versions/${versionId}/pdf/page-count`);
+
+export const runChecklist = (versionId: string) =>
+  apiFetch<{ run: ChecklistRunView }>(`/api/versions/${versionId}/checklist`, { method: "POST" });
+
+export const getLatestChecklist = (versionId: string) =>
+  apiFetch<{ run: ChecklistRunView | null }>(`/api/versions/${versionId}/checklist`);
 
 // --- Version prompts ---
 

@@ -77,3 +77,23 @@ export interface GalleryPromptItem {
   createdAt: string;
   creatorDisplayName: string;
 }
+
+export type ChecklistCategory =
+  | "grammar" | "typos" | "formatting" | "margins" | "fonts"
+  | "dates" | "page_count" | "hallucinations" | "missing_facts" | "pdf_safety";
+
+export interface ChecklistItemView {
+  id: string;
+  category: ChecklistCategory;
+  label: string;
+  status: "passed" | "warning" | "failed";
+  detail: string;
+}
+
+export interface ChecklistRunView {
+  id: string;
+  versionId: string;
+  overallStatus: "passed" | "warning" | "failed";
+  resultsJson: ChecklistItemView[];
+  createdAt: string;
+}
