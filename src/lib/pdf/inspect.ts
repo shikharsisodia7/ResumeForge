@@ -27,6 +27,12 @@ export interface PdfTextItem {
   x: number;
   /** Rendered width in PDF points. */
   width: number;
+  /** pdf.js's internal font resource id for this run — stable per distinct
+   * embedded font on a page, opaque otherwise. Used only to count distinct
+   * fonts in use, never displayed. */
+  fontName: string;
+  /** Approximate font size in PDF points, derived from the text matrix. */
+  fontSizePt: number;
 }
 
 export interface PdfPageInspection {
@@ -64,11 +70,16 @@ export async function inspectPdf(buffer: Buffer): Promise<PdfInspection> {
     const content = await page.getTextContent();
     const items: PdfTextItem[] = content.items
       // Some items are marked-content markers without a transform/str.
-      .filter((item): item is typeof item & { str: string; transform: number[]; width: number } => "str" in item)
+      .filter(
+        (item): item is typeof item & { str: string; transform: number[]; width: number; fontName: string } =>
+          "str" in item && "fontName" in item,
+      )
       .map((item) => ({
         text: item.str,
         x: item.transform[4],
         width: item.width,
+        fontName: item.fontName,
+        fontSizePt: Math.round(Math.hypot(item.transform[0], item.transform[1]) * 100) / 100,
       }));
     pages.push({
       pageNumber,
