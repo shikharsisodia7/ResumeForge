@@ -99,21 +99,23 @@ npm run dev                 # http://localhost:3000
 
 ## Testing
 
-`npm run test` runs the Vitest suite (94 tests): file validation (type sniffing, size limits,
-extension/content mismatch), text normalization, structured AI-output validation, style-patch
-validation (closed vocabulary, range checks, `sectionOrder` permutation), reset behavior, the
-fabrication guard, the structured-output repair/retry path, cross-user ownership isolation
-(`requireOwnedResume`/`requireOwnedVersion`/`requireOwnedPrompt`), the gallery prompt-copy
-route (independent copy, duplicate-copy idempotency, self-copy rejection), the direct-to-Blob
-upload flow (cross-user pathname rejection, idempotent finalize replay, concurrent-finalize race
-resolution, content-mismatch cleanup), the atomic generation-rate-limit reservation (lock
-ordering, bounded retry, no spurious rejection on a transient miss), the orphaned-upload cleanup
-cron (auth gate, age-threshold filtering, partial-failure reporting), and the e2e webServer
-identity check (`src/lib/dev/assert-expected-server.ts`). All external services (Prisma, the AI
-model) are mocked at the module boundary — no live database or API key is needed to run this
+`npm run test` runs the Vitest suite (136 tests across 27 files): file validation (type sniffing,
+size limits, extension/content mismatch), text normalization, structured AI-output validation,
+style-patch validation (closed vocabulary, range checks, `sectionOrder` permutation), reset
+behavior, the fabrication guard, the structured-output repair/retry path, cross-user ownership
+isolation (`requireOwnedResume`/`requireOwnedVersion`/`requireOwnedPrompt`), the gallery
+prompt-copy route (independent copy, duplicate-copy idempotency, self-copy rejection), the
+direct-to-Blob upload flow (cross-user pathname rejection, idempotent finalize replay,
+concurrent-finalize race resolution, content-mismatch cleanup), the atomic generation-rate-limit
+reservation (lock ordering, bounded retry, no spurious rejection on a transient miss), the
+orphaned-upload cleanup cron (auth gate, age-threshold filtering, partial-failure reporting), the
+e2e webServer identity check (`src/lib/dev/assert-expected-server.ts`), and the full resume
+checklist (mechanical checks, AI-judged checks mocked at the module boundary, and the
+real-upload-pipeline fixtures — see "Resume checklist" below). All external services (Prisma, the
+AI model) are mocked at the module boundary — no live database or API key is needed to run this
 suite.
 
-`npm run test:e2e` (Playwright, 41 tests) covers what's verifiable without live Auth0/Postgres/
+`npm run test:e2e` (Playwright, 44 tests) covers what's verifiable without live Auth0/Postgres/
 OpenAI credentials: the landing page renders for signed-out visitors, every protected page/API
 route correctly redirects to/rejects with Auth0 login when signed out, real-Chromium layout
 regression checks (right-edge clipping, print isolation) against all 32 synthetic fixtures, and
@@ -124,7 +126,25 @@ is best verified manually against it.
 
 `RUN_AI_EVALS=true npm run test:ai-evals` runs a separate, opt-in live-model harness (6 fixtures
 against the real OpenAI extraction prompt) — costs real API tokens, so it never runs in CI or on
-a normal `npm test`. Requires a funded `OPENAI_API_KEY`.
+a normal `npm test`. Requires a funded `OPENAI_API_KEY`. As of this writing the connected OpenAI
+account has zero credits (a live call returns `429 You have no credits remaining`), so this
+harness cannot currently be run for real against production — see "Known limitations" below.
+
+### Resume checklist
+
+Every version can be run through a 31-item formatting/content checklist across 10 categories
+(grammar, typos, formatting, margins, fonts, dates, page count, hallucinations, missing facts,
+PDF safety — see `src/lib/checklist/definitions.ts` for the full, stable-ID list). 24 items are
+**mechanical** (pure functions over the real rendered PDF, no API key needed — see
+`src/lib/checklist/mechanical-checks.ts`, tested against the same 32-fixture battery plus 11 real
+PDF/DOCX file fixtures in `src/fixtures/source-file-fixtures.ts`, exercised through the real
+upload/extraction pipeline — `validateUploadedFile`/`extractResumeText` — including single-error,
+multi-error, and two file-safety-rejection fixtures); 7 subjective items (grammar quality, tense,
+spelling, punctuation, dropped facts) are **AI-judged** via one batched call, mocked in `npm test`
+and only run for real via `RUN_AI_EVALS=true npm run test:checklist-evals` (uses
+`SOURCE_TEXT_FIXTURES`; blocked by the zero-credits state noted above until the account is
+funded). The editor's "Run resume check" panel shows every item's live pending → checking →
+passed/warning/failed state, grouped by category.
 
 ## Continuous integration
 
@@ -197,3 +217,21 @@ testing.
 
 - The editor's "Apply" always commits a new revision (protected by Undo/Reset) rather than offering
   a separate non-committing preview step.
+- The checklist's visual "checking" progression is a staged reveal of the real, already-computed
+  server result (not a token-by-token live stream) — chosen for reliability on Vercel's serverless
+  functions over a fragile per-item SSE stream for a single batched AI call. See
+  `src/components/editor/checklist-panel.tsx`.
+- `FONT-001`/`FONT-002`/`MARG-001`/`FMT-003`/`FMT-006` are construction-guarantee regression
+  checks (the renderer can only ever emit one declared font/margin/section-order, by design) —
+  they prove the guarantee still holds rather than detecting per-resume variation.
+- The connected OpenAI account currently has zero credits (confirmed via a live call returning
+  `429 You have no credits remaining`), which blocks both `test:ai-evals` and the new
+  `test:checklist-evals` from running for real right now. This has happened before (see
+  `docs/resume-formatting-audit.md`, ISSUE-10) and was resolved by funding the account — no code
+  change is needed, only a billing action by the account owner.
+- `src/lib/pdf/inspect.ts` no longer resolves `pdfjs-dist`'s worker/font paths via
+  `require.resolve` (incompatible with Turbopack production builds); paths are derived via
+  `path.join(process.cwd(), "node_modules", "pdfjs-dist", ...)` instead. `next.config.ts` also
+  carries an `outputFileTracingIncludes` entry for those same pdfjs-dist files on the checklist
+  route, as defense-in-depth for Vercel's deployed function bundle. Keep both in mind if you touch
+  PDF inspection or pdfjs-dist upgrades.

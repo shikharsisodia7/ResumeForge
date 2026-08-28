@@ -132,14 +132,15 @@ The following checklist items were investigated and found already correctly impl
 - **Fix**: Rewrote both tests to assert the actual security property that matters: (1) the protected page's content never rendered for a signed-out visitor, and (2) the app's own `/auth/login` redirect genuinely fired, verified by walking the response's redirect chain (`response.request().redirectedFrom()`) rather than checking the final URL.
 - **Status**: Fixed and verified against the real, live Auth0 tenant — all 4 tests in this file now pass (`npx playwright test e2e/auth-and-landing.spec.ts` → 4 passed).
 
-### ISSUE-10 — Live production AI pipeline was blocked by exhausted OpenAI account credits (external, not a code defect; now resolved)
+### ISSUE-10 — Live production AI pipeline has repeatedly been blocked by exhausted OpenAI account credits (external, not a code defect; a recurring billing state, not a one-time incident)
 
-- **Area**: Production environment (`resumeforge1.vercel.app`), not application code
-- **Severity**: Was critical for the live product; external to this codebase
+- **Area**: Production environment (`resumeforge1.vercel.app`) and local live-eval runs, not application code
+- **Severity**: Critical for the live product whenever the account is at zero credits; external to this codebase
 - **Original finding (2026-08-08)**: A real synthetic `.txt` resume uploaded through the live, authenticated production UI failed extraction. Vercel's runtime error logs showed every `/api/resumes/upload` failure carrying the same LangChain/OpenAI error: `429 You have no credits remaining.` This was a billing/account-balance issue on the connected OpenAI account, not a bug in the extraction code, prompt, or schema.
 - **Positive finding along the way**: The dashboard showed "No resumes yet" both before and after the failed upload — confirming `createFormattedVersion`'s error path does **not** leave an orphaned `Resume` or half-created `ResumeVersion` row when the AI call fails, exactly as the architecture intends.
-- **Current status (2026-08-15)**: Re-ran the live evaluation harness against the same six fixtures with a funded key: `RUN_AI_EVALS=true npm run test:ai-evals` → **6/6 passed** (schema-valid 6/6, fact-preservation 6/6, hallucinations 0, clipping violations 0, model errors 0). The account was funded between the original finding and this pass; no code change was needed or made.
-- **Status**: Resolved (billing action taken by the account owner, outside this codebase).
+- **First resolution (2026-08-15)**: Re-ran the live evaluation harness against the same six fixtures with a funded key: `RUN_AI_EVALS=true npm run test:ai-evals` → **6/6 passed** (schema-valid 6/6, fact-preservation 6/6, hallucinations 0, clipping violations 0, model errors 0). The account was funded between the original finding and this pass; no code change was needed or made.
+- **Current status (2026-08-27)**: The account is at zero credits again — a live call during Task 19/20 work returned `429 You have no credits remaining`, blocking both `RUN_AI_EVALS=true npm run test:ai-evals` and the new `RUN_AI_EVALS=true npm run test:checklist-evals` from running for real. This confirms the account's credit balance is an operational state that can regress, not a one-time issue that was permanently fixed on 2026-08-15 — future maintainers should expect to hit this again and re-fund rather than assume it's resolved for good.
+- **Status**: Not resolved as of this writing. No code change is possible or needed here — this is purely a billing action for the account owner to take when live AI eval coverage or the live production pipeline is needed again.
 
 ### ISSUE-11 — Playwright's e2e suite silently attaches to the wrong app when its port is already occupied
 
