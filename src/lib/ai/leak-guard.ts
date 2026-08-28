@@ -10,17 +10,20 @@ import { AiOutputError } from "@/lib/errors";
  * *content* is actually resume prose, so this is a separate, deterministic
  * check independent of schema validation.
  */
-const LEAK_PATTERNS: RegExp[] = [
+export const COMMENTARY_PATTERNS: RegExp[] = [
   /here('?s| is)\s+(the|your)\s+(formatted|updated|revised)\s+resume/i,
   /as an ai (language model|assistant)/i,
   /i('m| am) (an ai|unable to|sorry)/i,
-  /```/,
-  /<\/?[a-z][a-z0-9]*(\s[^>]*)?>/i, // stray HTML tags
-  /^\s*\{[\s\S]*"[a-zA-Z]+"\s*:/, // a raw JSON object leaking through as text
   /\[INST\]|<\|.*?\|>/, // model-internal instruction/chat-turn tokens
 ];
 
-function stringFields(content: ResumeContent): string[] {
+export const MARKUP_PATTERNS: RegExp[] = [
+  /```/,
+  /<\/?[a-z][a-z0-9]*(\s[^>]*)?>/i, // stray HTML tags
+  /^\s*\{[\s\S]*"[a-zA-Z]+"\s*:/, // a raw JSON object leaking through as text
+];
+
+export function stringFields(content: ResumeContent): string[] {
   const fields: string[] = [content.basics.fullName, content.summary ?? ""];
   for (const e of content.experience) fields.push(e.title, e.organization, ...e.bullets);
   for (const e of content.education) fields.push(e.institution, ...e.highlights);
@@ -32,6 +35,15 @@ function stringFields(content: ResumeContent): string[] {
   return fields.filter(Boolean);
 }
 
+/** Non-throwing scan: returns the field values that matched any of `patterns`. */
+export function findLeakedCommentary(content: ResumeContent, patterns: RegExp[]): string[] {
+  const hits: string[] = [];
+  for (const field of stringFields(content)) {
+    if (patterns.some((pattern) => pattern.test(field))) hits.push(field);
+  }
+  return hits;
+}
+
 /**
  * Rejects AI output that contains leaked model commentary, chat wrapper
  * text, or raw markup instead of clean resume content. A best-effort,
@@ -39,13 +51,10 @@ function stringFields(content: ResumeContent): string[] {
  * for them.
  */
 export function assertNoLeakedCommentary(content: ResumeContent): void {
-  for (const field of stringFields(content)) {
-    for (const pattern of LEAK_PATTERNS) {
-      if (pattern.test(field)) {
-        throw new AiOutputError(
-          "The AI's response included non-resume commentary or markup, so it was rejected. Please try again.",
-        );
-      }
-    }
+  const hits = findLeakedCommentary(content, [...COMMENTARY_PATTERNS, ...MARKUP_PATTERNS]);
+  if (hits.length > 0) {
+    throw new AiOutputError(
+      "The AI's response included non-resume commentary or markup, so it was rejected. Please try again.",
+    );
   }
 }
