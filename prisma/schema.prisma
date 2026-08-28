@@ -81,8 +81,22 @@ model ResumeVersion {
 
   versionPrompts VersionPrompt[]
   generationRuns GenerationRun[]
+  checklistRuns  ChecklistRun[]
 
   @@index([resumeId])
+}
+
+/// The result of one AI-checklist review pass over a version's current
+/// content/style, shown to the user as the checklist walkthrough UI.
+model ChecklistRun {
+  id            String        @id @default(cuid())
+  versionId     String
+  version       ResumeVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  resultsJson   Json
+  overallStatus String
+  createdAt     DateTime      @default(now())
+
+  @@index([versionId, createdAt])
 }
 
 /// A reusable natural-language formatting instruction saved by its creator.
@@ -129,6 +143,7 @@ enum GenerationOperation {
   TAILOR
   RESET
   UNDO
+  CHECKLIST
 }
 
 enum GenerationStatus {
