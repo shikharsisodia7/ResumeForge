@@ -7,8 +7,7 @@ function normalizeStat(token: string): string {
   return token.toLowerCase().replace(/\s+/g, "");
 }
 
-function extractStats(content: ResumeContent): Set<string> {
-  const text = flattenBulletText(content);
+export function extractStats(text: string): Set<string> {
   const matches = text.match(STAT_PATTERN) ?? [];
   return new Set(matches.map(normalizeStat));
 }
@@ -23,7 +22,7 @@ function flattenBulletText(content: ResumeContent): string {
   return parts.join(" \n ");
 }
 
-function flattenAllText(content: ResumeContent): string {
+export function flattenAllText(content: ResumeContent): string {
   const parts: string[] = [flattenBulletText(content), content.basics.fullName];
   for (const e of content.experience) parts.push(e.organization, e.title);
   for (const e of content.education) parts.push(e.institution, e.degree ?? "", e.fieldOfStudy ?? "");
@@ -41,8 +40,8 @@ function flattenAllText(content: ResumeContent): string {
  * back to the source resume at all.
  */
 export function assertNoFabrication(baseContent: ResumeContent, newContent: ResumeContent): void {
-  const baseStats = extractStats(baseContent);
-  const newStats = extractStats(newContent);
+  const baseStats = extractStats(flattenBulletText(baseContent));
+  const newStats = extractStats(flattenBulletText(newContent));
   const inventedStats = [...newStats].filter((stat) => !baseStats.has(stat));
   if (inventedStats.length > 0) {
     throw new AiOutputError(
