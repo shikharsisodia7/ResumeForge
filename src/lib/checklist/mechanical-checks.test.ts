@@ -5,6 +5,7 @@ import { renderResumePdf } from "@/lib/pdf/render";
 import { inspectPdf, type PdfInspection } from "@/lib/pdf/inspect";
 import { evaluateMechanicalChecklist, type ChecklistItemResult } from "@/lib/checklist/mechanical-checks";
 import { MECHANICAL_ITEM_IDS } from "@/lib/checklist/definitions";
+import type { ResumeContent } from "@/lib/schemas/resume-content";
 
 async function runFor(fixtureId: string) {
   const { content, styleOverrides } = fixtureById(fixtureId);
@@ -132,5 +133,51 @@ describe("evaluateMechanicalChecklist — FACT-003 negative case", () => {
       inspection: brokenInspection,
     });
     expect(statusOf(results, "FACT-003")).toBe("failed");
+  });
+});
+
+describe("evaluateMechanicalChecklist — SAFE-003 mojibake", () => {
+  // Every character below is written as an escape on purpose: these strings
+  // are literally look-alike glyphs, so a literal here would be invisible to
+  // review and one careless re-encode of this file would silently neuter the
+  // test. The values are what real UTF-8 bytes look like once they have been
+  // re-decoded as CP1252 - the exact corruption SAFE-003 exists to catch.
+
+  // U+2019 (right single quote) is UTF-8 E2 80 99; read back as CP1252 that
+  // is U+00E2 U+20AC U+2122. This is the single most common mojibake in real
+  // resume text, and the pre-fix regex did not match it.
+  const MOJIBAKE_SMART_QUOTE = "Owned the platform team\u00E2\u20AC\u2122s billing migration.";
+  // U+00E9 is UTF-8 C3 A9; read back as CP1252 that is U+00C3 U+00A9.
+  const MOJIBAKE_ACCENT = "Partnered with Jos\u00C3\u00A9 Ramirez on quarterly forecasting.";
+  // The same two sentences, correctly encoded, plus a real en dash.
+  const CLEAN_UNICODE = "Partnered with Jos\u00E9 Ram\u00EDrez on the team\u2019s 2024\u20132025 roadmap.";
+
+  async function safe003ForSummary(summary: string): Promise<string> {
+    const { content, styleOverrides } = fixtureById("01-clean-baseline");
+    const style = { ...DEFAULT_RESUME_STYLE, ...styleOverrides };
+    const mutated: ResumeContent = { ...content, summary };
+    const pdfBuffer = await renderResumePdf(mutated, style);
+    const inspection = await inspectPdf(pdfBuffer);
+    const results = await evaluateMechanicalChecklist({
+      content: mutated,
+      style,
+      sourceText: "irrelevant for these assertions",
+      resume: { mimeType: "application/pdf" },
+      pdfBuffer,
+      inspection,
+    });
+    return statusOf(results, "SAFE-003");
+  }
+
+  it("SAFE-003: fails on CP1252-mangled smart-quote mojibake", async () => {
+    expect(await safe003ForSummary(MOJIBAKE_SMART_QUOTE)).toBe("failed");
+  });
+
+  it("SAFE-003: fails on a CP1252-mangled accented character", async () => {
+    expect(await safe003ForSummary(MOJIBAKE_ACCENT)).toBe("failed");
+  });
+
+  it("SAFE-003: still passes clean, correctly-encoded accents, smart quotes and dashes", async () => {
+    expect(await safe003ForSummary(CLEAN_UNICODE)).toBe("passed");
   });
 });

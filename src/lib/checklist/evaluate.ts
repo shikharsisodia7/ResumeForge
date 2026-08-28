@@ -15,6 +15,12 @@ export interface ChecklistRunItem extends ChecklistItemResult {
 export interface ChecklistRunResult {
   overallStatus: ChecklistItemStatus;
   items: ChecklistRunItem[];
+  /** True when the AI-judged half never really ran: the model call failed and
+   * every AI item was degraded to a warning. `overallStatus` alone cannot
+   * express this (a total AI outage reads as "warning", not "failed"), so any
+   * caller that needs to distinguish a real verdict from a placeholder one —
+   * notably scripts/run-checklist-evals.ts — must check this flag. */
+  aiDegraded: boolean;
 }
 
 function overallStatusOf(results: ChecklistItemResult[]): ChecklistItemStatus {
@@ -34,12 +40,12 @@ export async function runChecklistEvaluation(params: {
   const pdfBuffer = await renderResumePdf(content, style);
   const inspection = await inspectPdf(pdfBuffer);
 
-  const [mechanicalResults, aiResults] = await Promise.all([
+  const [mechanicalResults, aiOutcome] = await Promise.all([
     evaluateMechanicalChecklist({ content, style, sourceText, resume, pdfBuffer, inspection }),
     evaluateAiJudgedChecklist(content, sourceText),
   ]);
 
-  const byId = new Map([...mechanicalResults, ...aiResults].map((r) => [r.id, r]));
+  const byId = new Map([...mechanicalResults, ...aiOutcome.items].map((r) => [r.id, r]));
 
   const items: ChecklistRunItem[] = CHECKLIST_ITEMS.map((def) => {
     const result = byId.get(def.id);
@@ -47,5 +53,5 @@ export async function runChecklistEvaluation(params: {
     return { ...result, category: def.category, label: checklistItemById(def.id).label, kind: def.kind };
   });
 
-  return { overallStatus: overallStatusOf(items), items };
+  return { overallStatus: overallStatusOf(items), items, aiDegraded: aiOutcome.degraded };
 }
