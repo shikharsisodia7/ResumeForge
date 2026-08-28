@@ -152,6 +152,7 @@ export function ChecklistPanel({ versionId, revision }: { versionId: string; rev
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium">
                     <span className="flex items-center gap-2">
                       <StatusIcon status={worst} />
+                      <span className="sr-only">{statusLabel(worst)}: </span>
                       {category.label}
                     </span>
                     <span className="flex items-center gap-2 text-xs text-muted-foreground">
