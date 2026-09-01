@@ -681,6 +681,23 @@ export const RESUME_FIXTURES: ResumeFixture[] = [
     content: minimalContent({ summary: "Here is the formatted resume: Backend engineer with 4 years of experience." }),
     expect: { forbiddenFacts: [] },
   },
+  {
+    id: "33-may-date-false-mismatch",
+    area: "layout",
+    description: "A 'May 2021' date alongside other full-word month dates ('September 2023', 'June 2021', 'August 2023').",
+    defect: "'May' is the correct full-word spelling of that month and also happens to be exactly 3 letters, coincidentally matching the abbreviated-date regex.",
+    expectedBehavior: "All dates are genuinely full-word; DATE-001 must not flag a format mismatch just because 'May' is 3 letters.",
+    content: minimalContent({
+      education: [
+        { id: "edu-1", institution: "Northfield Ridge University", degree: "B.S.", fieldOfStudy: "Computer Science", startDate: "May 2021", endDate: "May 2021", highlights: [] },
+      ],
+      experience: [
+        oneRole({ id: "exp-1", startDate: "September 2023", endDate: "Present" }),
+        oneRole({ id: "exp-2", organization: "Copperfield Analytics", title: "Software Engineer II", startDate: "June 2021", endDate: "August 2023" }),
+      ],
+    }),
+    expect: { requiredFacts: ["Northfield Ridge University", "September 2023"] },
+  },
 ];
 
 export function fixtureById(id: string): ResumeFixture {

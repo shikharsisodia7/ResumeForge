@@ -179,6 +179,12 @@ function checkLongNamesFit(content: ResumeContent, inspection: PdfInspection, st
 // --- DATE-001 ---
 function classifyDateFormat(dateStr: string): string | null {
   if (/^\d{1,2}\/\d{4}$/.test(dateStr)) return "numeric";
+  // "May" is the correct spelling whether the surrounding dates are full-word
+  // or abbreviated (it has no distinct abbreviated form), so on its own it
+  // can't signal a format mismatch either way — exclude it before the
+  // length-based abbreviated/full-word checks below, which would otherwise
+  // misclassify it as "abbreviated" purely because it's 3 letters long.
+  if (/^may\s+\d{4}$/i.test(dateStr)) return null;
   if (/^[A-Za-z]{3}\.?\s+\d{4}$/.test(dateStr)) return "abbreviated";
   if (/^[A-Za-z]{4,9}\s+\d{4}$/.test(dateStr)) return "full-word";
   if (/^\d{4}$/.test(dateStr)) return "year-only";

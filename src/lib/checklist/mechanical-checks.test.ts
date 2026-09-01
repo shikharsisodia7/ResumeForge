@@ -95,6 +95,10 @@ describe("evaluateMechanicalChecklist — per-item regression coverage", () => {
     expect(statusOf(await runFor("06-inconsistent-date-formats"), "DATE-001")).toBe("warning");
   });
 
+  it("DATE-001: a 'May' date alongside other full-word dates is not a false mismatch", async () => {
+    expect(statusOf(await runFor("33-may-date-false-mismatch"), "DATE-001")).toBe("passed");
+  });
+
   it("FACT-003: a long URL with query params is preserved intact", async () => {
     expect(statusOf(await runFor("12-long-url-and-email"), "FACT-003")).toBe("passed");
   });
